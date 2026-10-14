@@ -19,27 +19,29 @@ st.markdown(
     """
 <style>
     /* ==========================================
-       1. DUIDELIJKE AFBAKENING PER VRAAG (CARDS)
+       1. ECHT DIKKE RAND ROND ELK CONTROLEBLOK
        ========================================== */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border: 3px solid #334155 !important;          /* Duidelijke donkere kaderlijn */
-        border-left: 14px solid #0d6efd !important;    /* Dikke blauwe balk links */
-        border-radius: 20px !important;
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    div.stVerticalBlockBorderWrapper {
+        border: 6px solid #1e293b !important;          /* 6 PIXELS DIKKE RAND */
+        border-radius: 24px !important;
         background-color: #ffffff !important;
         padding: 24px 20px !important;
-        margin-bottom: 35px !important;                /* Ruimte tussen de blokken */
-        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important; /* Duidelijke schaduw */
+        margin-top: 15px !important;
+        margin-bottom: 45px !important;                /* Grote witruimte tussen blokken */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22) !important; /* Duidelijke schaduw */
     }
 
-    /* Vraag titel met scheidingslijn eronder */
+    /* Vraag titel als een opvallende donkere kopbalk */
     .vraag-titel {
-        font-size: 30px !important;
+        font-size: 28px !important;
         font-weight: 900 !important;
-        color: #0f172a !important;
-        margin-bottom: 16px !important;
-        line-height: 1.25 !important;
-        padding-bottom: 12px !important;
-        border-bottom: 2px dashed #cbd5e1 !important;  /* Stippellijn onder vraag */
+        color: #ffffff !important;
+        background-color: #1e293b !important;          /* Donkere achtergrond */
+        padding: 14px 18px !important;
+        border-radius: 14px !important;
+        margin-bottom: 20px !important;
+        line-height: 1.3 !important;
     }
 
     /* ==========================================
@@ -432,7 +434,7 @@ if menu == "📋 Nieuwe Audit":
               st.session_state.sel_truck = truck_naam
               st.rerun()
 
-  # STAP 4: CONTROLEPUNTEN MET GROTE OK/NOK EN OPTIONELE CAMERA
+  # STAP 4: CONTROLEPUNTEN MET 6PX DIKKE KADERS
   if (
       st.session_state.sel_actie
       and st.session_state.sel_klant
@@ -454,16 +456,15 @@ if menu == "📋 Nieuwe Audit":
 
     antwoorden = []
     for i, vraag in enumerate(actieve_vragen):
-      # Elk controlepunt in een duidelijk afgebakend kader
+      # Elk controlepunt in een 6px dik omlijnd blok
       with st.container(border=True):
         st.markdown(
             f"<div class='vraag-titel'>{vraag}</div>", unsafe_allow_html=True
         )
 
-        # Huidige status ophalen (standaard 'OK')
         huidige_status = st.session_state.get(f"status_{i}", "OK")
 
-        # DIKKE OK EN NOK KNOPPEN NAAST ELKAAR
+        # DIKKE OK EN NOK KNOPPEN
         c_ok, c_nok = st.columns(2)
         with c_ok:
           is_ok = huidige_status == "OK"
@@ -486,7 +487,7 @@ if menu == "📋 Nieuwe Audit":
             st.session_state[f"status_{i}"] = "NOK"
             st.rerun()
 
-        # COMMENTAARVAK ONDER DE KNOPPEN
+        # COMMENTAARVAK
         comment = st.text_input(
             "Opmerking (optioneel):",
             key=f"comm_{i}",
@@ -509,7 +510,6 @@ if menu == "📋 Nieuwe Audit":
             st.session_state[f"show_cam_{i}"] = True
             st.rerun()
         else:
-          # Camera opent alleen als op de knop is gedrukt
           foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
           if foto is not None:
             tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
