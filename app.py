@@ -18,144 +18,57 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* 1. Knoppen: extra hoog en gecentreerd */
-    div.stButton > button, 
-    div[data-testid="stButton"] > button {
-        min-height: 95px !important;
-        border-radius: 18px !important;
+    /* Grote knoppen voor heftruckbediening */
+    div.stButton > button {
+        min-height: 85px !important;
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        border-radius: 16px !important;
         margin-bottom: 12px !important;
-        box-shadow: 0 5px 10px rgba(0,0,0,0.2) !important;
-        border: 2px solid #bbb !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 10px 15px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.18) !important;
+        transition: all 0.15s ease-in-out !important;
+        border: 2px solid #ccc !important;
     }
 
-    /* 2. Tekst in knoppen: extra groot (34px) en vet */
-    div.stButton > button p,
-    div[data-testid="stButton"] > button p,
-    div.stButton > button div[data-testid="stMarkdownContainer"] p {
-        font-size: 34px !important;
-        font-weight: 900 !important;
-        line-height: 1.2 !important;
-        margin: 0 !important;
-        text-align: center !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    /* 3. Logo's van automerken in de knoppen mooi schalen en uitlijnen */
-    div.stButton > button img,
-    div[data-testid="stButton"] > button img {
-        height: 52px !important;
-        max-height: 52px !important;
-        width: auto !important;
-        vertical-align: middle !important;
-        margin-right: 15px !important;
-        display: inline-block !important;
-        filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.3)) !important;
-    }
-
-    /* Geselecteerde knop: Knalblauw */
     div.stButton > button[kind="primary"] {
         background-color: #0d6efd !important;
-        border: 4px solid #084298 !important;
-    }
-    div.stButton > button[kind="primary"] p {
-        color: #ffffff !important;
+        color: white !important;
+        border: 3px solid #0a58ca !important;
+        transform: scale(1.02);
     }
 
-    /* Niet-geselecteerde knop */
     div.stButton > button[kind="secondary"] {
-        background-color: #f1f3f5 !important;
-    }
-    div.stButton > button[kind="secondary"] p {
+        background-color: #f8f9fa !important;
         color: #212529 !important;
     }
 
-    /* OK / NOK stootkussens */
+    /* Grote touch-tegels voor OK en NOK */
     div[data-testid="stRadio"] div[role="radiogroup"] > label {
-        padding: 18px 40px !important;
-        border-radius: 14px !important;
-        border: 3px solid #aaa !important;
+        padding: 16px 36px !important;
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        border-radius: 12px !important;
+        border: 2px solid #bbb !important;
         margin-right: 20px !important;
         background-color: #ffffff !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.12) !important;
-       OFFICIËLE MERKLOGO'S IN DE KNOPPEN
-       ========================================== */
-    
-    /* 1. BMW Logo */
-    div[class*="st-key-btn_k_BMW"] button::before {
-        content: "" !important;
-        display: inline-block !important;
-        width: 48px !important;
-        height: 48px !important;
-        margin-right: 15px !important;
-        background: url('https://cdn.simpleicons.org/bmw/0066B1') no-repeat center center !important;
-        background-size: contain !important;
-        flex-shrink: 0 !important;
-    }
-    div[class*="st-key-btn_k_BMW"] button[kind="primary"]::before {
-        background-image: url('https://cdn.simpleicons.org/bmw/white') !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
     }
 
-    /* 2. Toyota Logo */
-    div[class*="st-key-btn_k_Toyota"] button::before {
-        content: "" !important;
-        display: inline-block !important;
-        width: 52px !important;
-        height: 48px !important;
-        margin-right: 15px !important;
-        background: url('https://cdn.simpleicons.org/toyota/EB0A1E') no-repeat center center !important;
-        background-size: contain !important;
-        flex-shrink: 0 !important;
-    }
-    div[class*="st-key-btn_k_Toyota"] button[kind="primary"]::before {
-        background-image: url('https://cdn.simpleicons.org/toyota/white') !important;
-    }
-
-    /* 3. Scania Logo */
-    div[class*="st-key-btn_k_Scania"] button::before {
-        content: "" !important;
-        display: inline-block !important;
-        width: 52px !important;
-        height: 48px !important;
-        margin-right: 15px !important;
-        background: url('https://cdn.simpleicons.org/scania/041E42') no-repeat center center !important;
-        background-size: contain !important;
-        flex-shrink: 0 !important;
-    }
-    div[class*="st-key-btn_k_Scania"] button[kind="primary"]::before {
-        background-image: url('https://cdn.simpleicons.org/scania/white') !important;
-    }
-        
-    }
-    div[data-testid="stRadio"] div[role="radiogroup"] > label p {
-        font-size: 28px !important;
-        font-weight: 900 !important;
-        margin: 0 !important;
-    }
-
-    /* Titels van controlepunten */
     h4 {
-        font-size: 28px !important;
-        margin-top: 22px !important;
-        font-weight: 900 !important;
+        font-size: 26px !important;
+        margin-top: 18px !important;
+        font-weight: bold !important;
     }
-
+    
     div[data-testid="stTextInput"] input {
-        font-size: 22px !important;
-        min-height: 60px !important;
+        font-size: 20px !important;
+        min-height: 55px !important;
     }
 
     div[data-testid="stCameraInput"] button {
-        min-height: 75px !important;
-    }
-    div[data-testid="stCameraInput"] button p {
-        font-size: 24px !important;
-        font-weight: 800 !important;
+        min-height: 70px !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
     }
 </style>
 """,
@@ -232,7 +145,7 @@ def set_setting(key, value):
     conn.commit()
 
 
-# Standaard instellingen
+# Standaard instellingen (gescheiden vragen per actie)
 standaard_vragen = {
     "Load": [
         "1. Laadkwaliteit & gewichtsverdeling",
@@ -268,25 +181,11 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
+# Ophalen uit de database
 vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
-
-
-# ==========================================
-# HELPER: LOGO'S EN EMOJI'S PER KLANT
-# ==========================================
-def format_klant_knop(klant_naam: str) -> str:
-  """Knoppenlabels: Emojis voor Grieshaber/TS-Lux, pure tekst voor de automerken (logo via CSS)."""
-  if klant_naam == "Grieshaber":
-    return "🛞 Grieshaber"
-  elif klant_naam == "TS-Lux":
-    return "🏢 TS-Lux"
-  elif klant_naam in ["BMW", "Toyota", "Scania"]:
-    return klant_naam  # Het logo wordt via CSS ingeladen!
-  return f"🏢 {klant_naam}"
-
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -417,7 +316,7 @@ if menu == "📋 Nieuwe Audit":
       st.session_state.sel_actie = "Unload"
       st.rerun()
 
-  # STAP 2: GROTE KLANT KNOPPEN (MET LOGO'S)
+  # STAP 2: GROTE KLANT KNOPPEN
   if st.session_state.sel_actie:
     st.write("---")
     st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
@@ -428,10 +327,8 @@ if menu == "📋 Nieuwe Audit":
       for j, klant_naam in enumerate(klanten_lijst[i : i + kolommen_per_rij]):
         with cols[j]:
           is_active = st.session_state.sel_klant == klant_naam
-          # Knoplabel met logo of aangepaste emoji
-          knop_label = format_klant_knop(klant_naam)
           if st.button(
-              knop_label,
+              f"🏢 {klant_naam}",
               key=f"btn_k_{klant_naam}",
               use_container_width=True,
               type="primary" if is_active else "secondary",
@@ -485,6 +382,7 @@ if menu == "📋 Nieuwe Audit":
     )
     st.subheader(f"4. Controlepunten voor {st.session_state.sel_actie}")
 
+    # Haal specifiek de vragen op voor de gekozen actie
     actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
 
     if not actieve_vragen:
