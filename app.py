@@ -168,7 +168,7 @@ huidige_gebruiker = st.session_state.user["username"]
 is_admin = st.session_state.user["role"] == "admin"
 
 st.sidebar.markdown(f"### 👤 Ingelogd: `{huidige_gebruiker}`")
-st.sidebar.caption(f"Rol: {'Beheerder' if is_admin else 'Inspecteur'}")
+st.sidebar.caption(f"Rol: {'Beheerder' if is_admin else 'Auditor'}")
 
 if st.sidebar.button("🚪 Uitloggen", use_container_width=True):
   st.session_state.logged_in = False
@@ -177,11 +177,18 @@ if st.sidebar.button("🚪 Uitloggen", use_container_width=True):
 
 st.sidebar.write("---")
 
-menu_opties = ["📋 Nieuwe Audit", "📊 Historie & Foto's"]
+# Alleen de beheerder krijgt het navigatiemenu te zien
 if is_admin:
-  menu_opties.append("⚙️ Beheer & Instellingen")
-
-menu = st.sidebar.radio("Navigatie", menu_opties)
+  menu_opties = [
+      "📋 Nieuwe Audit",
+      "📊 Historie & Foto's",
+      "⚙️ Beheer & Instellingen",
+  ]
+  menu = st.sidebar.radio("Navigatie", menu_opties)
+else:
+  # Auditors zien GEEN keuzemenu, maar gaan direct naar het formulier
+  st.sidebar.info("📋 Modus: Audit Uitvoeren")
+  menu = "📋 Nieuwe Audit"
 
 
 # ==========================================
