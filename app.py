@@ -83,6 +83,54 @@ st.markdown(
         margin-right: 20px !important;
         background-color: #ffffff !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.12) !important;
+       OFFICIËLE MERKLOGO'S IN DE KNOPPEN
+       ========================================== */
+    
+    /* 1. BMW Logo */
+    div[class*="st-key-btn_k_BMW"] button::before {
+        content: "" !important;
+        display: inline-block !important;
+        width: 48px !important;
+        height: 48px !important;
+        margin-right: 15px !important;
+        background: url('https://cdn.simpleicons.org/bmw/0066B1') no-repeat center center !important;
+        background-size: contain !important;
+        flex-shrink: 0 !important;
+    }
+    div[class*="st-key-btn_k_BMW"] button[kind="primary"]::before {
+        background-image: url('https://cdn.simpleicons.org/bmw/white') !important;
+    }
+
+    /* 2. Toyota Logo */
+    div[class*="st-key-btn_k_Toyota"] button::before {
+        content: "" !important;
+        display: inline-block !important;
+        width: 52px !important;
+        height: 48px !important;
+        margin-right: 15px !important;
+        background: url('https://cdn.simpleicons.org/toyota/EB0A1E') no-repeat center center !important;
+        background-size: contain !important;
+        flex-shrink: 0 !important;
+    }
+    div[class*="st-key-btn_k_Toyota"] button[kind="primary"]::before {
+        background-image: url('https://cdn.simpleicons.org/toyota/white') !important;
+    }
+
+    /* 3. Scania Logo */
+    div[class*="st-key-btn_k_Scania"] button::before {
+        content: "" !important;
+        display: inline-block !important;
+        width: 52px !important;
+        height: 48px !important;
+        margin-right: 15px !important;
+        background: url('https://cdn.simpleicons.org/scania/041E42') no-repeat center center !important;
+        background-size: contain !important;
+        flex-shrink: 0 !important;
+    }
+    div[class*="st-key-btn_k_Scania"] button[kind="primary"]::before {
+        background-image: url('https://cdn.simpleicons.org/scania/white') !important;
+    }
+        
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label p {
         font-size: 28px !important;
@@ -230,25 +278,14 @@ klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
 # HELPER: LOGO'S EN EMOJI'S PER KLANT
 # ==========================================
 def format_klant_knop(klant_naam: str) -> str:
-  """Koppelt officiële logo's of aangepaste emoji's aan de knoppen."""
-  logos = {
-      # Officiële transparante logo's via Wikimedia Commons
-      "BMW": (
-          "![BMW](https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/100px-BMW.svg.png)"
-          " BMW"
-      ),
-      "Toyota": (
-          "![Toyota](https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Toyota_logo_%282020%29.svg/100px-Toyota_logo_%282020%29.svg.png)"
-          " Toyota"
-      ),
-      "Scania": (
-          "![Scania](https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Scania_Logo.svg/100px-Scania_Logo.svg.png)"
-          " Scania"
-      ),
-      "Grieshaber": "🛞 Grieshaber",  # Autoband emoji
-      "TS-Lux": "🏢 TS-Lux",  # Oorspronkelijke stijl
-  }
-  return logos.get(klant_naam, f"🏢 {klant_naam}")
+  """Knoppenlabels: Emojis voor Grieshaber/TS-Lux, pure tekst voor de automerken (logo via CSS)."""
+  if klant_naam == "Grieshaber":
+    return "🛞 Grieshaber"
+  elif klant_naam == "TS-Lux":
+    return "🏢 TS-Lux"
+  elif klant_naam in ["BMW", "Toyota", "Scania"]:
+    return klant_naam  # Het logo wordt via CSS ingeladen!
+  return f"🏢 {klant_naam}"
 
 
 # ==========================================
