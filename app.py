@@ -13,12 +13,12 @@ st.set_page_config(
 )
 
 # ==========================================
-# HEFTRUCK & TABLET STYLING (CSS - EXTRA GROTE TEKST)
+# HEFTRUCK & TABLET STYLING (CSS)
 # ==========================================
 st.markdown(
     """
 <style>
-    /* 1. De knop zelf: hoog en gecentreerd */
+    /* 1. Knoppen: extra hoog en gecentreerd */
     div.stButton > button, 
     div[data-testid="stButton"] > button {
         min-height: 95px !important;
@@ -32,7 +32,7 @@ st.markdown(
         padding: 10px 15px !important;
     }
 
-    /* 2. DE TEKST IN DE KNOP: Vullend, extra groot (34px) en vet */
+    /* 2. Tekst in knoppen: extra groot (34px) en vet */
     div.stButton > button p,
     div[data-testid="stButton"] > button p,
     div.stButton > button div[data-testid="stMarkdownContainer"] p {
@@ -41,9 +41,24 @@ st.markdown(
         line-height: 1.2 !important;
         margin: 0 !important;
         text-align: center !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* Geselecteerde knop: Knalblauw met witte vette tekst */
+    /* 3. Logo's van automerken in de knoppen mooi schalen en uitlijnen */
+    div.stButton > button img,
+    div[data-testid="stButton"] > button img {
+        height: 52px !important;
+        max-height: 52px !important;
+        width: auto !important;
+        vertical-align: middle !important;
+        margin-right: 15px !important;
+        display: inline-block !important;
+        filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.3)) !important;
+    }
+
+    /* Geselecteerde knop: Knalblauw */
     div.stButton > button[kind="primary"] {
         background-color: #0d6efd !important;
         border: 4px solid #084298 !important;
@@ -52,7 +67,7 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* Niet-geselecteerde knop: Duidelijk leesbaar donkergrijs */
+    /* Niet-geselecteerde knop */
     div.stButton > button[kind="secondary"] {
         background-color: #f1f3f5 !important;
     }
@@ -60,7 +75,7 @@ st.markdown(
         color: #212529 !important;
     }
 
-    /* 3. OK / NOK stootkussens ook voorzien van vullende tekst */
+    /* OK / NOK stootkussens */
     div[data-testid="stRadio"] div[role="radiogroup"] > label {
         padding: 18px 40px !important;
         border-radius: 14px !important;
@@ -75,20 +90,18 @@ st.markdown(
         margin: 0 !important;
     }
 
-    /* 4. Titels van controlepunten lekker leesbaar vanop afstand */
+    /* Titels van controlepunten */
     h4 {
         font-size: 28px !important;
         margin-top: 22px !important;
         font-weight: 900 !important;
     }
 
-    /* 5. Invoervelden voor opmerkingen */
     div[data-testid="stTextInput"] input {
         font-size: 22px !important;
         min-height: 60px !important;
     }
 
-    /* 6. Cameraknop tekst */
     div[data-testid="stCameraInput"] button {
         min-height: 75px !important;
     }
@@ -171,7 +184,7 @@ def set_setting(key, value):
     conn.commit()
 
 
-# Standaard instellingen (gescheiden vragen per actie)
+# Standaard instellingen
 standaard_vragen = {
     "Load": [
         "1. Laadkwaliteit & gewichtsverdeling",
@@ -207,11 +220,36 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
-# Ophalen uit de database
 vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
+
+
+# ==========================================
+# HELPER: LOGO'S EN EMOJI'S PER KLANT
+# ==========================================
+def format_klant_knop(klant_naam: str) -> str:
+  """Koppelt officiële logo's of aangepaste emoji's aan de knoppen."""
+  logos = {
+      # Officiële transparante logo's via Wikimedia Commons
+      "BMW": (
+          "![BMW](https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/100px-BMW.svg.png)"
+          " BMW"
+      ),
+      "Toyota": (
+          "![Toyota](https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Toyota_logo_%282020%29.svg/100px-Toyota_logo_%282020%29.svg.png)"
+          " Toyota"
+      ),
+      "Scania": (
+          "![Scania](https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Scania_Logo.svg/100px-Scania_Logo.svg.png)"
+          " Scania"
+      ),
+      "Grieshaber": "🛞 Grieshaber",  # Autoband emoji
+      "TS-Lux": "🏢 TS-Lux",  # Oorspronkelijke stijl
+  }
+  return logos.get(klant_naam, f"🏢 {klant_naam}")
+
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -342,7 +380,7 @@ if menu == "📋 Nieuwe Audit":
       st.session_state.sel_actie = "Unload"
       st.rerun()
 
-  # STAP 2: GROTE KLANT KNOPPEN
+  # STAP 2: GROTE KLANT KNOPPEN (MET LOGO'S)
   if st.session_state.sel_actie:
     st.write("---")
     st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
@@ -353,8 +391,10 @@ if menu == "📋 Nieuwe Audit":
       for j, klant_naam in enumerate(klanten_lijst[i : i + kolommen_per_rij]):
         with cols[j]:
           is_active = st.session_state.sel_klant == klant_naam
+          # Knoplabel met logo of aangepaste emoji
+          knop_label = format_klant_knop(klant_naam)
           if st.button(
-              f"🏢 {klant_naam}",
+              knop_label,
               key=f"btn_k_{klant_naam}",
               use_container_width=True,
               type="primary" if is_active else "secondary",
@@ -408,7 +448,6 @@ if menu == "📋 Nieuwe Audit":
     )
     st.subheader(f"4. Controlepunten voor {st.session_state.sel_actie}")
 
-    # Haal specifiek de vragen op voor de gekozen actie
     actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
 
     if not actieve_vragen:
