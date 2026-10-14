@@ -4,6 +4,9 @@ import json
 import os
 import sqlite3
 import zipfile
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import pandas as pd
 import streamlit as st
 
@@ -146,7 +149,104 @@ os.makedirs(FOTO_MAP, exist_ok=True)
 DB_PATH = "audit_systeem.db"
 
 # ==========================================
-# DATABASE SETUP
+# GOOGLE DRIVE CLOUD KOPPELING
+# ==========================================
+@st.cache_resource
+def get_drive_service():
+  """Verbindt met Google Drive via st.secrets."""
+  if "gcp_service_account" not in st.secrets:
+    return None
+  try:
+    creds_info = dict(st.secrets["gcp_service_account"])
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build("drive", "v3", credentials=credentials)
+  except Exception as e:
+    st.error(f"Fout bij verbinden met Google Drive: {e}")
+    return None
+
+
+def find_drive_file(service, parent_id, filename):
+  """Zoekt een specifiek bestand op naam in een Drive map."""
+  try:
+    query = (
+        f"'{parent_id}' in parents and name = '{filename}' and trashed = false"
+    )
+    res = (
+        service.files()
+        .list(q=query, spaces="drive", fields="files(id, name)")
+        .execute()
+    )
+    files = res.get("files", [])
+    if files:
+      return files[0]["id"]
+  except Exception:
+    pass
+  return None
+
+
+def read_drive_file_bytes(service, file_id):
+  """Downloadt de bytes van een bestand uit Google Drive."""
+  try:
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+      status, done = downloader.next_chunk()
+    fh.seek(0)
+    return fh.read()
+  except Exception:
+    return None
+
+
+def save_or_update_drive_file(
+    service, parent_id, filename, data_bytes, mime_type
+):
+  """Slaat een bestand op of overschrijft het in Google Drive."""
+  try:
+    file_id = find_drive_file(service, parent_id, filename)
+    media = MediaIoBaseUpload(
+        io.BytesIO(data_bytes), mimetype=mime_type, resumable=True
+    )
+    if file_id:
+      service.files().update(fileId=file_id, media_body=media).execute()
+      return file_id
+    else:
+      file_meta = {"name": filename, "parents": [parent_id]}
+      f = (
+          service.files()
+          .create(body=file_meta, media_body=media, fields="id")
+          .execute()
+      )
+      return f.get("id")
+  except Exception as e:
+    print(f"Drive upload error: {e}")
+    return None
+
+
+def create_drive_folder(service, parent_id, folder_name):
+  """Maakt een submap aan in Google Drive."""
+  try:
+    folder_meta = {
+        "name": folder_name,
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [parent_id],
+    }
+    f = (
+        service.files()
+        .create(body=folder_meta, fields="id")
+        .execute()
+    )
+    return f.get("id")
+  except Exception as e:
+    print(f"Drive folder error: {e}")
+    return None
+
+
+# ==========================================
+# DATABASE & CONFIGURATIE (SYNC MET DRIVE)
 # ==========================================
 def get_db():
   conn = sqlite3.connect(DB_PATH)
@@ -190,7 +290,30 @@ def init_db():
 init_db()
 
 
+@st.cache_data(ttl=60)
+def load_all_settings_from_drive():
+  """Laadt instellingen uit settings.json op Google Drive indien aanwezig."""
+  service = get_drive_service()
+  if service and "gdrive" in st.secrets:
+    parent_id = st.secrets["gdrive"]["folder_id"]
+    file_id = find_drive_file(service, parent_id, "settings.json")
+    if file_id:
+      content = read_drive_file_bytes(service, file_id)
+      if content:
+        try:
+          return json.loads(content.decode("utf-8"))
+        except Exception:
+          pass
+  return {}
+
+
 def get_setting(key, default):
+  # 1. Probeer uit Google Drive settings.json
+  drive_settings = load_all_settings_from_drive()
+  if key in drive_settings:
+    return drive_settings[key]
+
+  # 2. Fallback op lokale SQLite
   with get_db() as conn:
     row = (
         conn.cursor()
@@ -199,16 +322,32 @@ def get_setting(key, default):
     )
     if row:
       return json.loads(row["value"])
-    return default
+  return default
 
 
 def set_setting(key, value):
+  # 1. Lokaal opslaan
   with get_db() as conn:
     conn.cursor().execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
         (key, json.dumps(value)),
     )
     conn.commit()
+
+  # 2. Permanent opslaan in Google Drive
+  service = get_drive_service()
+  if service and "gdrive" in st.secrets:
+    parent_id = st.secrets["gdrive"]["folder_id"]
+    drive_settings = load_all_settings_from_drive()
+    drive_settings[key] = value
+    save_or_update_drive_file(
+        service,
+        parent_id,
+        "settings.json",
+        json.dumps(drive_settings, indent=2).encode("utf-8"),
+        "application/json",
+    )
+    load_all_settings_from_drive.clear()
 
 
 # Standaard instellingen
@@ -251,6 +390,7 @@ vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
+
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -456,7 +596,6 @@ if menu == "📋 Nieuwe Audit":
 
     antwoorden = []
     for i, vraag in enumerate(actieve_vragen):
-      # Elk controlepunt in een 6px dik omlijnd blok
       with st.container(border=True):
         st.markdown(
             f"<div class='vraag-titel'>{vraag}</div>", unsafe_allow_html=True
@@ -464,7 +603,6 @@ if menu == "📋 Nieuwe Audit":
 
         huidige_status = st.session_state.get(f"status_{i}", "OK")
 
-        # DIKKE OK EN NOK KNOPPEN
         c_ok, c_nok = st.columns(2)
         with c_ok:
           is_ok = huidige_status == "OK"
@@ -487,14 +625,12 @@ if menu == "📋 Nieuwe Audit":
             st.session_state[f"status_{i}"] = "NOK"
             st.rerun()
 
-        # COMMENTAARVAK
         comment = st.text_input(
             "Opmerking (optioneel):",
             key=f"comm_{i}",
             placeholder="Typ hier eventuele opmerkingen of schades...",
         )
 
-        # OPTIONELE CAMERA KNOP ('Take picture')
         foto_bestandsnaam = st.session_state.get(f"saved_foto_{i}", "")
         camera_open = st.session_state.get(f"show_cam_{i}", False)
 
@@ -513,7 +649,6 @@ if menu == "📋 Nieuwe Audit":
           foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
           if foto is not None:
             tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # Veilige naam maken zonder vreemde tekens of schuine strepen
             safe_truck = (
                 "".join(
                     c
@@ -526,9 +661,7 @@ if menu == "📋 Nieuwe Audit":
             foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
             foto_pad = os.path.join(FOTO_MAP, foto_bestandsnaam)
 
-            # GARANDEER dat de map bestaat vlak voor het wegschrijven:
             os.makedirs(FOTO_MAP, exist_ok=True)
-
             with open(foto_pad, "wb") as f:
               f.write(foto.getbuffer())
 
@@ -560,15 +693,19 @@ if menu == "📋 Nieuwe Audit":
         type="primary",
         use_container_width=True,
     ):
+      now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      audit_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
+
+      # 1. Lokaal opslaan in SQLite
       with get_db() as conn:
         c = conn.cursor()
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c.execute(
             """
-                    INSERT INTO audits (timestamp, actie, klant, truck, auditor) 
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO audits (id, timestamp, actie, klant, truck, auditor) 
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """,
             (
+                audit_id,
                 now_str,
                 st.session_state.sel_actie,
                 st.session_state.sel_klant,
@@ -576,7 +713,6 @@ if menu == "📋 Nieuwe Audit":
                 huidige_gebruiker,
             ),
         )
-        audit_id = c.lastrowid
 
         for item in antwoorden:
           c.execute(
@@ -594,9 +730,104 @@ if menu == "📋 Nieuwe Audit":
           )
         conn.commit()
 
-      st.success(f"✅ Audit #{audit_id} succesvol opgeslagen!")
+      # 2. Permanent opslaan in Google Drive (Dossier + Centrale Database)
+      service = get_drive_service()
+      drive_gelukt = False
+      if service and "gdrive" in st.secrets:
+        try:
+          parent_folder_id = st.secrets["gdrive"]["folder_id"]
 
-      # Reset alle velden voor de volgende rit
+          # A. Maak een submap aan voor dit dossier
+          submap_naam = f"{now_str.replace(':', '').replace(' ', '_')}_{st.session_state.sel_actie}_{st.session_state.sel_klant}_{st.session_state.sel_truck}_{huidige_gebruiker}".replace(
+              " ", "_"
+          )
+          dossier_folder_id = create_drive_folder(
+              service, parent_folder_id, submap_naam
+          )
+
+          # B. Upload foto's en verzamel Drive IDs
+          foto_drive_ids = {}
+          for item in antwoorden:
+            foto_naam = item.get("foto_pad")
+            if foto_naam:
+              pad = os.path.join(FOTO_MAP, foto_naam)
+              if os.path.exists(pad):
+                with open(pad, "rb") as f:
+                  f_bytes = f.read()
+                f_id = save_or_update_drive_file(
+                    service,
+                    dossier_folder_id,
+                    foto_naam,
+                    f_bytes,
+                    "image/png",
+                )
+                foto_drive_ids[foto_naam] = f_id
+
+          # C. Maak rijen voor de centrale database
+          nieuwe_rijen = []
+          for item in antwoorden:
+            fn = item["foto_pad"]
+            nieuwe_rijen.append({
+                "audit_id": audit_id,
+                "timestamp": now_str,
+                "actie": st.session_state.sel_actie,
+                "klant": st.session_state.sel_klant,
+                "truck": st.session_state.sel_truck,
+                "auditor": huidige_gebruiker,
+                "vraag": item["vraag"],
+                "status": item["status"],
+                "commentaar": item["commentaar"],
+                "foto_pad": fn,
+                "foto_drive_id": foto_drive_ids.get(fn, ""),
+            })
+
+          df_nieuwe_audit = pd.DataFrame(nieuwe_rijen)
+
+          # D. Upload audit_rapport.csv in het submapje
+          save_or_update_drive_file(
+              service,
+              dossier_folder_id,
+              "audit_rapport.csv",
+              df_nieuwe_audit.to_csv(index=False).encode("utf-8"),
+              "text/csv",
+          )
+
+          # E. Voeg toe aan master_audit_database.csv in de hoofdmap
+          master_file_id = find_drive_file(
+              service, parent_folder_id, "master_audit_database.csv"
+          )
+          if master_file_id:
+            master_bytes = read_drive_file_bytes(service, master_file_id)
+            try:
+              df_oud = pd.read_csv(io.BytesIO(master_bytes))
+              df_master = pd.concat(
+                  [df_oud, df_nieuwe_audit], ignore_index=True
+              )
+            except Exception:
+              df_master = df_nieuwe_audit
+          else:
+            df_master = df_nieuwe_audit
+
+          save_or_update_drive_file(
+              service,
+              parent_folder_id,
+              "master_audit_database.csv",
+              df_master.to_csv(index=False).encode("utf-8"),
+              "text/csv",
+          )
+          drive_gelukt = True
+        except Exception as e:
+          st.error(f"Fout bij uploaden naar Google Drive: {e}")
+
+      if drive_gelukt:
+        st.success(
+            f"✅ Audit #{audit_id} succesvol opgeslagen én geüpload naar Google"
+            f" Drive in map `{submap_naam}`!"
+        )
+      else:
+        st.success(f"✅ Audit #{audit_id} succesvol opgeslagen!")
+
+      # Reset selecties
       st.session_state.sel_actie = None
       st.session_state.sel_klant = None
       st.session_state.sel_truck = None
@@ -609,52 +840,83 @@ if menu == "📋 Nieuwe Audit":
       st.rerun()
 
 # ==========================================
-# ONDERDEEL 2: HISTORIE (ALLEEN ADMIN)
+# ONDERDEEL 2: HISTORIE (LIVESTREAM UIT GOOGLE DRIVE)
 # ==========================================
 elif menu == "📊 Historie & Foto's" and is_admin:
   st.title("📊 Historisch Overzicht & Downloads")
 
-  with get_db() as conn:
-    audits_df = pd.read_sql_query(
-        "SELECT * FROM audits ORDER BY id DESC", conn
+  service = get_drive_service()
+  audits_compleet_df = pd.DataFrame()
+
+  # 1. Probeer eerst data rechtstreeks uit Google Drive te laden
+  if service and "gdrive" in st.secrets:
+    parent_folder_id = st.secrets["gdrive"]["folder_id"]
+    master_file_id = find_drive_file(
+        service, parent_folder_id, "master_audit_database.csv"
+    )
+    if master_file_id:
+      content = read_drive_file_bytes(service, master_file_id)
+      if content:
+        try:
+          audits_compleet_df = pd.read_csv(io.BytesIO(content))
+        except Exception:
+          pass
+
+  # 2. Fallback op lokale SQLite als Drive leeg/niet verbonden is
+  if audits_compleet_df.empty:
+    with get_db() as conn:
+      query_compleet = """
+                SELECT a.id as audit_id, a.timestamp, a.actie, a.klant, a.truck, a.auditor,
+                       i.vraag, i.status, i.commentaar, i.foto_pad, '' as foto_drive_id
+                FROM audits a
+                JOIN audit_items i ON a.id = i.audit_id
+                ORDER BY a.id DESC
+            """
+      try:
+        audits_compleet_df = pd.read_sql_query(query_compleet, conn)
+      except Exception:
+        audits_compleet_df = pd.DataFrame()
+
+  if audits_compleet_df.empty:
+    st.info("Er zijn nog geen audits geregistreerd in Google Drive.")
+  else:
+    # Zorg voor unieke rittenoverzicht
+    ritten_df = (
+        audits_compleet_df[[
+            "audit_id",
+            "timestamp",
+            "actie",
+            "klant",
+            "truck",
+            "auditor",
+        ]]
+        .drop_duplicates()
+        .sort_values(by="audit_id", ascending=False)
     )
 
-  if audits_df.empty:
-    st.info("Er zijn nog geen audits geregistreerd.")
-  else:
     col1, col2 = st.columns(2)
     with col1:
       filter_truck = st.multiselect(
           "Filter op Truck",
-          options=audits_df["truck"].unique(),
-          default=audits_df["truck"].unique(),
+          options=ritten_df["truck"].unique(),
+          default=ritten_df["truck"].unique(),
       )
     with col2:
       filter_klant = st.multiselect(
           "Filter op Klant",
-          options=audits_df["klant"].unique(),
-          default=audits_df["klant"].unique(),
+          options=ritten_df["klant"].unique(),
+          default=ritten_df["klant"].unique(),
       )
 
-    gefilterde_audits = audits_df[
-        audits_df["truck"].isin(filter_truck)
-        & audits_df["klant"].isin(filter_klant)
+    gefilterde_ritten = ritten_df[
+        ritten_df["truck"].isin(filter_truck)
+        & ritten_df["klant"].isin(filter_klant)
     ]
 
     st.subheader("📥 Export Opties")
     col_d1, col_d2 = st.columns(2)
 
-    with get_db() as conn:
-      query_compleet = """
-                SELECT a.id as audit_id, a.timestamp, a.actie, a.klant, a.truck, a.auditor,
-                       i.vraag, i.status, i.commentaar, i.foto_pad
-                FROM audits a
-                JOIN audit_items i ON a.id = i.audit_id
-                ORDER BY a.id DESC
-            """
-      compleet_df = pd.read_sql_query(query_compleet, conn)
-
-    csv_data = compleet_df.to_csv(index=False).encode("utf-8")
+    csv_data = audits_compleet_df.to_csv(index=False).encode("utf-8")
     with col_d1:
       st.download_button(
           label="📄 Download Data als CSV (Excel)",
@@ -685,32 +947,53 @@ elif menu == "📊 Historie & Foto's" and is_admin:
       )
 
     st.write("---")
-    st.subheader("Rittenoverzicht")
+    st.subheader("Rittenoverzicht (Live uit Google Drive)")
 
-    for _, audit in gefilterde_audits.iterrows():
-      titel = f"Audit #{audit['id']} | {audit['truck']} ({audit['klant']}) - {audit['actie']} om {audit['timestamp']}"
+    for _, rit in gefilterde_ritten.iterrows():
+      titel = f"Audit #{rit['audit_id']} | {rit['truck']} ({rit['klant']}) - {rit['actie']} om {rit['timestamp']}"
       with st.expander(titel):
-        st.write(f"**Inspecteur:** {audit['auditor']}")
-        with get_db() as conn:
-          items = conn.cursor().execute(
-              "SELECT * FROM audit_items WHERE audit_id = ?", (audit["id"],)
-          ).fetchall()
+        st.write(f"**Inspecteur:** {rit['auditor']}")
 
-        for it in items:
+        items = audits_compleet_df[
+            audits_compleet_df["audit_id"] == rit["audit_id"]
+        ]
+
+        for _, it in items.iterrows():
           kleur = "🟢" if it["status"] == "OK" else "🔴"
           st.markdown(
               f"**{kleur} {it['vraag']}** — Status: **{it['status']}**"
           )
-          if it["commentaar"]:
+          if pd.notna(it["commentaar"]) and it["commentaar"]:
             st.write(f"💬 Opmerking: *{it['commentaar']}*")
-          if it["foto_pad"]:
-            foto_locatie = os.path.join(FOTO_MAP, it["foto_pad"])
-            if os.path.exists(foto_locatie):
+
+          if pd.notna(it["foto_pad"]) and it["foto_pad"]:
+            lokale_foto = os.path.join(FOTO_MAP, str(it["foto_pad"]))
+
+            # 1. Probeer lokaal te laden
+            if os.path.exists(lokale_foto):
               st.image(
-                  foto_locatie,
+                  lokale_foto,
                   caption=f"Foto: {it['foto_pad']}",
                   width=350,
               )
+            # 2. Indien gewist door herstart: haal live op uit Google Drive!
+            elif (
+                service
+                and pd.notna(it.get("foto_drive_id"))
+                and it["foto_drive_id"]
+            ):
+              foto_bytes = read_drive_file_bytes(
+                  service, str(it["foto_drive_id"])
+              )
+              if foto_bytes:
+                # Bewaar direct lokaal voor de volgende keer
+                with open(lokale_foto, "wb") as f_save:
+                  f_save.write(foto_bytes)
+                st.image(
+                    foto_bytes,
+                    caption=f"Foto: {it['foto_pad']} (uit Google Drive)",
+                    width=350,
+                )
           st.write("---")
 
 # ==========================================
