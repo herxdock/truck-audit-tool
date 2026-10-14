@@ -159,11 +159,12 @@ def get_drive_service():
   try:
     creds_info = dict(st.secrets["gcp_service_account"])
 
-    # DE CRUCIALE REPARATIE VOOR HET PEM / SYMBOOL 61 PROBLEEM:
     pk = str(creds_info.get("private_key", "")).strip()
     if pk.startswith('"') and pk.endswith('"'):
       pk = pk[1:-1]
-    creds_info["private_key"] = pk.replace("\\n", "\n")
+    if "\\n" in pk:
+      pk = pk.replace("\\n", "\n")
+    creds_info["private_key"] = pk
 
     credentials = service_account.Credentials.from_service_account_info(
         creds_info, scopes=["https://www.googleapis.com/auth/drive"]
@@ -182,7 +183,13 @@ def find_drive_file(service, parent_id, filename):
     )
     res = (
         service.files()
-        .list(q=query, spaces="drive", fields="files(id, name)")
+        .list(
+            q=query,
+            spaces="drive",
+            fields="files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        )
         .execute()
     )
     files = res.get("files", [])
@@ -196,7 +203,7 @@ def find_drive_file(service, parent_id, filename):
 def read_drive_file_bytes(service, file_id):
   """Downloadt de bytes van een bestand uit Google Drive."""
   try:
-    request = service.files().get_media(fileId=file_id)
+    request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
     done = False
@@ -208,28 +215,67 @@ def read_drive_file_bytes(service, file_id):
     return None
 
 
+def upload_direct_naar_drive(
+    service, parent_id, filename, data_bytes, mime_type
+):
+  """Uploadt een bestand direct en betrouwbaar (multipart) naar een Drive-map."""
+  try:
+    media = MediaIoBaseUpload(
+        io.BytesIO(data_bytes), mimetype=mime_type, resumable=False
+    )
+    file_meta = {"name": filename, "parents": [parent_id]}
+    f = (
+        service.files()
+        .create(
+            body=file_meta,
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+    return f.get("id")
+  except Exception as e:
+    st.error(f"Upload fout voor '{filename}': {e}")
+    return None
+
+
 def save_or_update_drive_file(
     service, parent_id, filename, data_bytes, mime_type
 ):
-  """Slaat een bestand op of overschrijft het in Google Drive."""
+  """Slaat een bestand op of overschrijft het in de hoofdmap."""
   try:
     file_id = find_drive_file(service, parent_id, filename)
     media = MediaIoBaseUpload(
-        io.BytesIO(data_bytes), mimetype=mime_type, resumable=True
+        io.BytesIO(data_bytes), mimetype=mime_type, resumable=False
     )
     if file_id:
-      service.files().update(fileId=file_id, media_body=media).execute()
-      return file_id
+      f = (
+          service.files()
+          .update(
+              fileId=file_id,
+              media_body=media,
+              fields="id",
+              supportsAllDrives=True,
+          )
+          .execute()
+      )
+      return f.get("id")
     else:
       file_meta = {"name": filename, "parents": [parent_id]}
       f = (
           service.files()
-          .create(body=file_meta, media_body=media, fields="id")
+          .create(
+              body=file_meta,
+              media_body=media,
+              fields="id",
+              supportsAllDrives=True,
+          )
           .execute()
       )
       return f.get("id")
   except Exception as e:
-    print(f"Drive upload error: {e}")
+    st.error(f"Fout bij opslaan van '{filename}' in Drive: {e}")
     return None
 
 
@@ -243,12 +289,12 @@ def create_drive_folder(service, parent_id, folder_name):
     }
     f = (
         service.files()
-        .create(body=folder_meta, fields="id")
+        .create(body=folder_meta, fields="id", supportsAllDrives=True)
         .execute()
     )
     return f.get("id")
   except Exception as e:
-    print(f"Drive folder error: {e}")
+    st.error(f"Fout bij aanmaken map in Drive: {e}")
     return None
 
 
@@ -315,12 +361,10 @@ def load_all_settings_from_drive():
 
 
 def get_setting(key, default):
-  # 1. Probeer uit Google Drive settings.json
   drive_settings = load_all_settings_from_drive()
   if key in drive_settings:
     return drive_settings[key]
 
-  # 2. Fallback op lokale SQLite
   with get_db() as conn:
     row = (
         conn.cursor()
@@ -333,7 +377,6 @@ def get_setting(key, default):
 
 
 def set_setting(key, value):
-  # 1. Lokaal opslaan
   with get_db() as conn:
     conn.cursor().execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
@@ -341,7 +384,6 @@ def set_setting(key, value):
     )
     conn.commit()
 
-  # 2. Permanent opslaan in Google Drive
   service = get_drive_service()
   if service and "gdrive" in st.secrets:
     parent_id = st.secrets["gdrive"]["folder_id"]
@@ -397,7 +439,6 @@ vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
-
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -737,7 +778,7 @@ if menu == "📋 Nieuwe Audit":
           )
         conn.commit()
 
-      # 2. Permanent opslaan in Google Drive (Dossier + Centrale Database)
+      # 2. Permanent opslaan in Google Drive (Direct en betrouwbaar)
       service = get_drive_service()
       drive_gelukt = False
       if service and "gdrive" in st.secrets:
@@ -752,7 +793,7 @@ if menu == "📋 Nieuwe Audit":
               service, parent_folder_id, submap_naam
           )
 
-          # B. Upload foto's en verzamel Drive IDs
+          # B. Upload foto's direct naar het submapje
           foto_drive_ids = {}
           for item in antwoorden:
             foto_naam = item.get("foto_pad")
@@ -761,14 +802,15 @@ if menu == "📋 Nieuwe Audit":
               if os.path.exists(pad):
                 with open(pad, "rb") as f:
                   f_bytes = f.read()
-                f_id = save_or_update_drive_file(
+                f_id = upload_direct_naar_drive(
                     service,
                     dossier_folder_id,
                     foto_naam,
                     f_bytes,
                     "image/png",
                 )
-                foto_drive_ids[foto_naam] = f_id
+                if f_id:
+                  foto_drive_ids[foto_naam] = f_id
 
           # C. Maak rijen voor de centrale database
           nieuwe_rijen = []
@@ -790,8 +832,8 @@ if menu == "📋 Nieuwe Audit":
 
           df_nieuwe_audit = pd.DataFrame(nieuwe_rijen)
 
-          # D. Upload audit_rapport.csv in het submapje
-          save_or_update_drive_file(
+          # D. Upload audit_rapport.csv direct in het submapje
+          upload_direct_naar_drive(
               service,
               dossier_folder_id,
               "audit_rapport.csv",
@@ -855,7 +897,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
   service = get_drive_service()
   audits_compleet_df = pd.DataFrame()
 
-  # 1. Probeer eerst data rechtstreeks uit Google Drive te laden
   if service and "gdrive" in st.secrets:
     parent_folder_id = st.secrets["gdrive"]["folder_id"]
     master_file_id = find_drive_file(
@@ -869,7 +910,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
         except Exception:
           pass
 
-  # 2. Fallback op lokale SQLite als Drive leeg/niet verbonden is
   if audits_compleet_df.empty:
     with get_db() as conn:
       query_compleet = """
@@ -975,14 +1015,12 @@ elif menu == "📊 Historie & Foto's" and is_admin:
           if pd.notna(it["foto_pad"]) and it["foto_pad"]:
             lokale_foto = os.path.join(FOTO_MAP, str(it["foto_pad"]))
 
-            # 1. Probeer eerst lokaal te laden
             if os.path.exists(lokale_foto):
               st.image(
                   lokale_foto,
                   caption=f"Foto: {it['foto_pad']}",
                   width=350,
               )
-            # 2. Indien gewist door server-herstart: haal direct live op uit Google Drive!
             elif (
                 service
                 and pd.notna(it.get("foto_drive_id"))
@@ -1015,7 +1053,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
       "❓ Vragen per Actie",
   ])
 
-  # --- TAB 1: KOPPELINGEN ---
   with tab1:
     st.subheader("Koppel vrachtwagens aan een klant")
     gekozen_klant = st.selectbox("Kies Klant", klanten_lijst)
@@ -1036,7 +1073,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
       )
       st.rerun()
 
-  # --- TAB 2: KLANTEN ---
   with tab2:
     nieuwe_klant = st.text_input("Nieuwe klant toevoegen")
     if st.button("Voeg klant toe"):
@@ -1056,7 +1092,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve klanten:", klanten_lijst)
 
-  # --- TAB 3: TRUCKS ---
   with tab3:
     nieuwe_truck = st.text_input("Nieuwe vrachtwagen toevoegen")
     if st.button("Voeg truck toe"):
@@ -1073,7 +1108,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve trucks:", trucks_lijst)
 
-  # --- TAB 4: VRAGEN PER ACTIE (LOAD / UNLOAD) ---
   with tab4:
     st.subheader("Controlepunten beheren per Actie")
     actie_keuze = st.radio(
