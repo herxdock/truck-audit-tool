@@ -8,6 +8,17 @@ from fpdf import FPDF
 import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
+from zoneinfo import ZoneInfo
+
+# ==========================================
+# BRUSSELSE TIJDZONE HELPER
+# ==========================================
+BRUSSEL_TZ = ZoneInfo("Europe/Brussels")
+
+
+def get_now():
+  """Geeft altijd de actuele tijd in de Brusselse tijdzone (Europe/Brussels)."""
+  return datetime.now(BRUSSEL_TZ)
 
 # Pagina instellingen
 st.set_page_config(
@@ -248,7 +259,7 @@ class AuditPDF(FPDF):
     self.cell(
         0,
         7,
-        f"Gegenereerd: {datetime.now().strftime('%d-%m-%Y %H:%M')}",
+        f"Gegenereerd: {get_now().strftime('%d-%m-%Y %H:%M')}",
         border=False,
         align="R",
     )
@@ -615,7 +626,7 @@ if menu == "📋 Nieuwe Audit":
   col_head1, col_head2 = st.columns([3, 1])
   with col_head1:
     st.caption(
-        f"Inspecteur: **{huidige_gebruiker}** |"
+        f"Inspecteur: **{huidige_gebruiker}** | {get_now().strftime('%d-%m-%Y %H:%M')}"
         f" {datetime.now().strftime('%d-%m-%Y %H:%M')}"
     )
   with col_head2:
@@ -775,7 +786,7 @@ if menu == "📋 Nieuwe Audit":
         else:
           foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
           if foto is not None:
-            tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+            tijd_tag = get_now().strftime("%Y%m%d_%H%M%S")
             safe_truck = (
                 "".join(
                     c
@@ -818,8 +829,8 @@ if menu == "📋 Nieuwe Audit":
         type="primary",
         use_container_width=True,
     ):
-      now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-      audit_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
+      now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
+      audit_id = int(get_now().strftime("%y%m%d%H%M%S"))
       client = get_supabase()
 
       if not client:
