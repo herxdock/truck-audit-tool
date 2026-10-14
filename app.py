@@ -2,7 +2,9 @@ from datetime import datetime
 import io
 import json
 import os
+import urllib.request
 import zipfile
+from fpdf import FPDF
 import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
@@ -40,7 +42,7 @@ st.markdown(
         padding: 14px 18px !important;
         border-radius: 14px !important;
         margin-bottom: 20px !important;
-        line-line: 1.3 !important;
+        line-height: 1.3 !important;
     }
 
     /* 2. GROTE TOUCHKNOPPEN */
@@ -210,6 +212,304 @@ vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
+
+
+# ==========================================
+# PDF RAPPORTAGE GENERATOR (FPDF2)
+# ==========================================
+class AuditPDF(FPDF):
+
+  def __init__(self, titel_rapport="TRUCK AUDIT RAPPORT"):
+    super().__init__()
+    self.titel_rapport = titel_rapport
+
+  def header(self):
+    if os.path.exists("logo.png"):
+      try:
+        self.image("logo.png", 10, 8, 30)
+        self.set_xy(45, 10)
+      except Exception:
+        self.set_xy(10, 10)
+    else:
+      self.set_xy(10, 10)
+
+    self.set_font("helvetica", "B", 14)
+    self.set_text_color(30, 41, 59)
+    self.cell(0, 8, self.titel_rapport, border=False, align="L")
+    self.ln(6)
+    self.set_font("helvetica", "", 8)
+    self.set_text_color(100, 116, 139)
+    self.cell(
+        0,
+        5,
+        f"Gegenereerd op: {datetime.now().strftime('%d-%m-%Y %H:%M')}",
+        border=False,
+        align="L",
+    )
+    self.ln(10)
+    self.set_draw_color(203, 213, 225)
+    self.line(10, self.get_y(), 200, self.get_y())
+    self.ln(5)
+
+  def footer(self):
+    self.set_y(-15)
+    self.set_font("helvetica", "I", 8)
+    self.set_text_color(148, 163, 184)
+    self.cell(
+        0,
+        10,
+        f"Pagina {self.page_no()}/{{nb}} - Vertrouwelijk Kwaliteitsrapport",
+        align="C",
+    )
+
+
+def download_afbeelding_bytes(url):
+  """Haalt betrouwbaar de afbeeldingsbytes op van Supabase."""
+  try:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=8) as resp:
+      return resp.read()
+  except Exception:
+    return None
+
+
+def genereer_pdf_rapport(
+    gefilterde_ritten,
+    gefilterde_items,
+    van_datum,
+    tot_datum,
+    is_enkele_rit=False,
+):
+  """Genereert een compleet multi-audit PDF rapport inclusief foto's."""
+  titel = (
+      "TRUCK AUDIT DOSSIER"
+      if is_enkele_rit
+      else "PERIODIEK AUDIT- & KWALITEITSRAPPORT"
+  )
+  pdf = AuditPDF(titel_rapport=titel)
+  pdf.alias_nb_pages()
+  pdf.set_auto_page_break(auto=True, margin=15)
+  pdf.add_page()
+
+  # 1. SAMENVATTING / COVER BLOK (bij meervoudig rapport)
+  if not is_enkele_rit:
+    pdf.set_font("helvetica", "B", 12)
+    pdf.set_fill_color(241, 245, 249)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 8, "  1. MANAGEMENT SAMENVATTING", fill=True, ln=True)
+    pdf.ln(2)
+
+    pdf.set_font("helvetica", "", 9)
+    pdf.cell(40, 6, "Geselecteerde Periode:", border=False)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.cell(
+        0,
+        6,
+        f"{van_datum.strftime('%d-%m-%Y')} t/m {tot_datum.strftime('%d-%m-%Y')}",
+        ln=True,
+    )
+
+    totaal = len(gefilterde_ritten)
+    ritten_met_nok = gefilterde_items[gefilterde_items["status"] == "NOK"][
+        "audit_id"
+    ].nunique()
+    ritten_ok = totaal - ritten_met_nok
+    pct_ok = round((ritten_ok / totaal) * 100, 1) if totaal > 0 else 0
+
+    pdf.set_font("helvetica", "", 9)
+    pdf.cell(40, 6, "Totaal Aantal Audits:", border=False)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.cell(0, 6, f"{totaal}", ln=True)
+
+    pdf.set_font("helvetica", "", 9)
+    pdf.cell(40, 6, "Kwaliteitsscore (OK):", border=False)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.set_text_color(25, 135, 84)
+    pdf.cell(0, 6, f"{ritten_ok} ritten 100% goedgekeurd ({pct_ok}%)", ln=True)
+
+    if ritten_met_nok > 0:
+      pdf.set_font("helvetica", "", 9)
+      pdf.set_text_color(15, 23, 42)
+      pdf.cell(40, 6, "Afwijkingen / Schades:", border=False)
+      pdf.set_font("helvetica", "B", 9)
+      pdf.set_text_color(220, 53, 69)
+      pdf.cell(
+          0,
+          6,
+          f"{ritten_met_nok} ritten met minstens 1 afwijking (NOK)",
+          ln=True,
+      )
+
+    pdf.ln(5)
+
+    # Tabel met overzicht van alle ritten
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_fill_color(30, 41, 59)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(20, 7, "Rit #", fill=True, align="C")
+    pdf.cell(32, 7, "Datum & Tijd", fill=True)
+    pdf.cell(20, 7, "Actie", fill=True)
+    pdf.cell(28, 7, "Klant", fill=True)
+    pdf.cell(28, 7, "Truck", fill=True)
+    pdf.cell(32, 7, "Inspecteur", fill=True)
+    pdf.cell(30, 7, "Oordeel", fill=True, align="C")
+    pdf.ln(7)
+
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(15, 23, 42)
+
+    for idx, rit in gefilterde_ritten.iterrows():
+      sub = gefilterde_items[gefilterde_items["audit_id"] == rit["audit_id"]]
+      heeft_nok = "NOK" in sub["status"].values
+      bg_color = (254, 242, 242) if heeft_nok else (255, 255, 255)
+
+      pdf.set_fill_color(*bg_color)
+      pdf.cell(20, 6, f"#{rit['audit_id']}", border="B", fill=True, align="C")
+      pdf.cell(32, 6, str(rit["timestamp"])[:16], border="B", fill=True)
+      pdf.cell(20, 6, str(rit["actie"]), border="B", fill=True)
+      pdf.cell(28, 6, str(rit["klant"]), border="B", fill=True)
+      pdf.cell(28, 6, str(rit["truck"]), border="B", fill=True)
+      pdf.cell(32, 6, str(rit["auditor"])[:18], border="B", fill=True)
+
+      if heeft_nok:
+        pdf.set_text_color(220, 53, 69)
+        pdf.cell(
+            30, 6, "AFWIJKING (NOK)", border="B", fill=True, align="C"
+        )
+      else:
+        pdf.set_text_color(25, 135, 84)
+        pdf.cell(30, 6, "100% OK", border="B", fill=True, align="C")
+
+      pdf.set_text_color(15, 23, 42)
+      pdf.ln(6)
+
+    pdf.ln(8)
+    pdf.set_font("helvetica", "B", 12)
+    pdf.set_fill_color(241, 245, 249)
+    pdf.cell(0, 8, "  2. GEDETAILLEERDE AUDIT DOSSIERS", fill=True, ln=True)
+    pdf.ln(4)
+
+  # 2. DETAILPAGINA'S PER RIT (INCLUSIEF FOTO'S)
+  for idx, rit in gefilterde_ritten.iterrows():
+    sub_items = gefilterde_items[
+        gefilterde_items["audit_id"] == rit["audit_id"]
+    ]
+    heeft_nok = "NOK" in sub_items["status"].values
+
+    # Als de pagina vol raakt, forceer een nette nieuwe pagina
+    if pdf.get_y() > 210:
+      pdf.add_page()
+
+    # Rit Header Card
+    if heeft_nok:
+      pdf.set_fill_color(220, 53, 69)  # Rood bij NOK
+      status_text = "AFWIJKING VASTGESTELD (NOK)"
+    else:
+      pdf.set_fill_color(25, 135, 84)  # Groen bij OK
+      status_text = "GOEDGEKEURD (100% OK)"
+
+    pdf.set_font("helvetica", "B", 10)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(
+        0,
+        7,
+        f"  AUDIT #{rit['audit_id']}  -  {rit['truck']} ({rit['klant']})  - "
+        f" {rit['actie']}   [{status_text}]",
+        fill=True,
+        ln=True,
+    )
+
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_fill_color(248, 250, 252)
+    pdf.set_text_color(51, 65, 85)
+    pdf.cell(
+        0,
+        6,
+        f"  Tijdstip: {rit['timestamp']}    |    Inspecteur: {rit['auditor']}",
+        fill=True,
+        border="B",
+        ln=True,
+    )
+    pdf.ln(2)
+
+    # Controlepunten tabel
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(71, 85, 105)
+    pdf.cell(100, 5, "Controlepunt", border="B")
+    pdf.cell(22, 5, "Status", border="B", align="C")
+    pdf.cell(68, 5, "Opmerkingen", border="B")
+    pdf.ln(5)
+
+    pdf.set_font("helvetica", "", 8)
+    for _, it in sub_items.iterrows():
+      is_nok_item = it["status"] == "NOK"
+      if is_nok_item:
+        pdf.set_text_color(220, 53, 69)
+        pdf.set_font("helvetica", "B", 8)
+      else:
+        pdf.set_text_color(30, 41, 59)
+        pdf.set_font("helvetica", "", 8)
+
+      pdf.cell(100, 5, str(it["vraag"])[:65], border="B")
+      pdf.cell(22, 5, str(it["status"]), border="B", align="C")
+      comm_text = str(it["commentaar"]) if pd.notna(it["commentaar"]) else ""
+      pdf.cell(68, 5, comm_text[:45], border="B")
+      pdf.ln(5)
+
+    pdf.set_text_color(15, 23, 42)
+    pdf.ln(2)
+
+    # FOTO'S INVOEGEN
+    fotos_in_rit = sub_items[
+        sub_items["foto_url"].notna() & (sub_items["foto_url"] != "")
+    ]
+    if len(fotos_in_rit) > 0:
+      pdf.set_font("helvetica", "B", 8)
+      pdf.set_text_color(15, 23, 42)
+      pdf.cell(0, 5, "Bijbehorende Fotobewijzen:", ln=True)
+
+      x_start = 12
+      y_start = pdf.get_y()
+      foto_w = 42
+      foto_h = 32
+
+      for f_idx, (_, f_row) in enumerate(fotos_in_rit.iterrows()):
+        # Controleer of foto's nog op de pagina passen
+        if pdf.get_y() + foto_h > 275:
+          pdf.add_page()
+          y_start = pdf.get_y()
+
+        img_bytes = download_afbeelding_bytes(f_row["foto_url"])
+        if img_bytes:
+          try:
+            x_pos = x_start + (f_idx % 4) * 46
+            if f_idx > 0 and f_idx % 4 == 0:
+              y_start += foto_h + 8
+            pdf.image(
+                io.BytesIO(img_bytes),
+                x=x_pos,
+                y=y_start,
+                w=foto_w,
+                h=foto_h,
+            )
+            # Klein onderschrift onder de foto
+            pdf.set_xy(x_pos, y_start + foto_h + 1)
+            pdf.set_font("helvetica", "", 6)
+            pdf.cell(
+                foto_w,
+                4,
+                f"Punt: {str(f_row['vraag'])[:25]}",
+                align="C",
+            )
+          except Exception:
+            pass
+
+      pdf.set_y(y_start + foto_h + 7)
+
+    pdf.ln(6)
+
+  return bytes(pdf.output())
+
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -516,7 +816,8 @@ if menu == "📋 Nieuwe Audit":
 
       if not client:
         st.error(
-            "Supabase verbinding niet gevonden. Controleer je secrets instelling."
+            "Supabase verbinding niet gevonden. Controleer je secrets"
+            " instellingen."
         )
       else:
         # 1. Upload alle gemaakte foto's naar de Supabase Bucket
@@ -630,7 +931,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
     ritten_df = pd.DataFrame(ritten_lijst)
     compleet_df = pd.DataFrame(items_lijst)
 
-    # Converteer timestamp naar datumformaat voor betrouwbare datumselectie
     try:
       ritten_df["datum"] = pd.to_datetime(ritten_df["timestamp"]).dt.date
     except Exception:
@@ -673,7 +973,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
         value=False,
     )
 
-    # Toepassen van de filters
     mask = (
         (ritten_df["datum"] >= van_datum)
         & (ritten_df["datum"] <= tot_datum)
@@ -683,7 +982,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
     )
     gefilterde_ritten = ritten_df[mask]
 
-    # Indien 'alleen NOK' aangevinkt staat
     if alleen_nok:
       nok_audit_ids = compleet_df[compleet_df["status"] == "NOK"][
           "audit_id"
@@ -701,12 +999,10 @@ elif menu == "📊 Historie & Foto's" and is_admin:
           "Geen audits gevonden voor deze specifieke filter-combinatie."
       )
     else:
-      # Items die horen bij de gefilterde ritten
       gefilterde_items = compleet_df[
           compleet_df["audit_id"].isin(gefilterde_ritten["audit_id"])
       ]
 
-      # Bereken statistieken
       ritten_met_nok_aantal = gefilterde_items[
           gefilterde_items["status"] == "NOK"
       ]["audit_id"].nunique()
@@ -716,7 +1012,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
           "foto_url"
       ].nunique()
 
-      # Toon 4 KPI kaarten
       kpi1, kpi2, kpi3, kpi4 = st.columns(4)
       kpi1.metric("📋 Totaal Audits", f"{totaal_aantal}")
       kpi2.metric("🟢 100% Goedgekeurd", f"{ritten_100_ok_aantal}", f"{pct_ok}%")
@@ -727,12 +1022,32 @@ elif menu == "📊 Historie & Foto's" and is_admin:
       )
       kpi4.metric("📷 Gemaakte Foto's", f"{totaal_fotos}")
 
-      # --- 3. RAPPORT DOWNLOADS (EXECUTIVE & DETAIL) ---
+      # --- 3. RAPPORT DOWNLOADS (PDF & CSV) ---
       st.write("---")
       st.subheader("📥 Export & Rapportages")
-      down_col1, down_col2 = st.columns(2)
+      down_col1, down_col2, down_col3 = st.columns(3)
 
-      # A. Management Samenvatting (1 rij per audit)
+      # 1. GROOT MULTI-AUDIT PDF RAPPORT
+      with st.spinner("PDF rapport wordt voorbereid..."):
+        pdf_bytes = genereer_pdf_rapport(
+            gefilterde_ritten,
+            gefilterde_items,
+            van_datum,
+            tot_datum,
+            is_enkele_rit=False,
+        )
+
+      with down_col1:
+        st.download_button(
+            label="📑 Download PDF Perioderapport (Alle ritten + foto's)",
+            data=pdf_bytes,
+            file_name=f"audit_rapport_{van_datum}_tot_{tot_datum}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+        )
+
+      # 2. Management Samenvatting CSV
       samenvatting_rijen = []
       for _, rit_info in gefilterde_ritten.iterrows():
         a_id = rit_info["audit_id"]
@@ -741,7 +1056,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
         aantal_nok = len(sub_items[sub_items["status"] == "NOK"])
         heeft_nok = aantal_nok > 0
 
-        # Alle opmerkingen samenvoegen tot 1 nette leesbare tekst
         opmerkingen_tekst = " | ".join([
             f"{r['vraag']}: {r['commentaar']}"
             for _, r in sub_items.iterrows()
@@ -764,20 +1078,20 @@ elif menu == "📊 Historie & Foto's" and is_admin:
       df_management_rapport = pd.DataFrame(samenvatting_rijen)
       csv_management = df_management_rapport.to_csv(index=False).encode("utf-8")
 
-      with down_col1:
+      with down_col2:
         st.download_button(
-            label="📄 Download Samenvatting (1 regel per rit)",
+            label="📄 Download Samenvatting (CSV)",
             data=csv_management,
             file_name=f"audit_samenvatting_{van_datum}_tot_{tot_datum}.csv",
             mime="text/csv",
             use_container_width=True,
         )
 
-      # B. Volledig Detailrapport (inclusief directe fotolinks)
+      # 3. Volledig Detailrapport CSV
       csv_detail = gefilterde_items.to_csv(index=False).encode("utf-8")
-      with down_col2:
+      with down_col3:
         st.download_button(
-            label="📋 Download Detailrapport (Alle controlepunten & fotolinks)",
+            label="📋 Download Details (CSV + Fotolinks)",
             data=csv_detail,
             file_name=f"audit_details_{van_datum}_tot_{tot_datum}.csv",
             mime="text/csv",
@@ -796,13 +1110,37 @@ elif menu == "📊 Historie & Foto's" and is_admin:
         ]
         rit_heeft_nok = "NOK" in items["status"].values
 
-        # Kleur en statusbadge in de titel van de rit
         status_icoon = "🔴" if rit_heeft_nok else "🟢"
         oordeel_label = "⚠️ AFWIJKING" if rit_heeft_nok else "100% OK"
         titel = f"{status_icoon} Audit #{rit['audit_id']} [{oordeel_label}] | {rit['truck']} ({rit['klant']}) - {rit['actie']} om {rit['timestamp']}"
 
         with st.expander(titel):
-          st.write(f"**Inspecteur:** {rit['auditor']}")
+          col_exp1, col_exp2 = st.columns([3, 1])
+          with col_exp1:
+            st.write(f"**Inspecteur:** {rit['auditor']}")
+          with col_exp2:
+            # Knop om alléén deze losse rit als PDF te downloaden
+            enkele_rit_df = gefilterde_ritten[
+                gefilterde_ritten["audit_id"] == rit["audit_id"]
+            ]
+            enkele_items_df = gefilterde_items[
+                gefilterde_items["audit_id"] == rit["audit_id"]
+            ]
+            pdf_enkel = genereer_pdf_rapport(
+                enkele_rit_df,
+                enkele_items_df,
+                van_datum,
+                tot_datum,
+                is_enkele_rit=True,
+            )
+            st.download_button(
+                label="📥 Download PDF van deze rit",
+                data=pdf_enkel,
+                file_name=f"Audit_Dossier_{rit['audit_id']}_{rit['truck']}.pdf",
+                mime="application/pdf",
+                key=f"dl_pdf_{rit['audit_id']}",
+                use_container_width=True,
+            )
 
           for _, it in items.iterrows():
             kleur = "🟢" if it["status"] == "OK" else "🔴"
