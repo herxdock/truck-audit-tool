@@ -106,23 +106,28 @@ klanten_lijst = get_setting("klanten", standaard_klanten)
 # INLOGGEN VIA STREAMLIT SECRETS
 # ==========================================
 def verify_login(username, password):
-  """Controleert inloggegevens direct via st.secrets."""
-  username = username.strip()
+  """Controleert inloggegevens direct via st.secrets (ondersteunt 'auditors' en negeert hoofdletters)."""
+  user_clean = username.strip().lower()
+  pass_clean = password.strip()
 
-  # Check of er überhaupt secrets zijn geconfigureerd
-  if "admins" not in st.secrets and "inspecteurs" not in st.secrets:
-    st.error("⚠️ Geen secrets gevonden! Configureer de secrets in Streamlit.")
-    return None
+  # 1. Controleer admins
+  if "admins" in st.secrets:
+    for admin_user, admin_pass in st.secrets["admins"].items():
+      if (
+          str(admin_user).lower() == user_clean
+          and str(admin_pass) == pass_clean
+      ):
+        return {"username": str(admin_user), "role": "admin"}
 
-  # 1. Controleer of gebruiker een Admin is
-  if "admins" in st.secrets and username in st.secrets["admins"]:
-    if str(st.secrets["admins"][username]) == str(password):
-      return {"username": username, "role": "admin"}
-
-  # 2. Controleer of gebruiker een Inspecteur is
-  if "inspecteurs" in st.secrets and username in st.secrets["inspecteurs"]:
-    if str(st.secrets["inspecteurs"][username]) == str(password):
-      return {"username": username, "role": "user"}
+  # 2. Controleer auditors (of inspecteurs)
+  groep = st.secrets.get("auditors", st.secrets.get("inspecteurs", None))
+  if groep:
+    for audit_user, audit_pass in groep.items():
+      if (
+          str(audit_user).lower() == user_clean
+          and str(audit_pass) == pass_clean
+      ):
+        return {"username": str(audit_user), "role": "user"}
 
   return None
 
