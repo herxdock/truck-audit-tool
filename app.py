@@ -281,7 +281,7 @@ if menu == "📋 Nieuwe Audit":
 # ==========================================
 # ONDERDEEL 2: HISTORIE & EXPORT
 # ==========================================
-elif menu == "📊 Historie & Foto's":
+elif menu == "📊 Historie & Foto's" and is_admin:
   st.title("📊 Historisch Overzicht & Downloads")
 
   with get_db() as conn:
