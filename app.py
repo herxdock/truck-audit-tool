@@ -13,62 +13,88 @@ st.set_page_config(
 )
 
 # ==========================================
-# HEFTRUCK & TABLET STYLING (CSS)
+# HEFTRUCK & TABLET STYLING (CSS - EXTRA GROTE TEKST)
 # ==========================================
 st.markdown(
     """
 <style>
-    /* Grote knoppen voor heftruckbediening */
-    div.stButton > button {
-        min-height: 85px !important;
-        font-size: 24px !important;
-        font-weight: 800 !important;
-        border-radius: 16px !important;
+    /* 1. De knop zelf: hoog en gecentreerd */
+    div.stButton > button, 
+    div[data-testid="stButton"] > button {
+        min-height: 95px !important;
+        border-radius: 18px !important;
         margin-bottom: 12px !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.18) !important;
-        transition: all 0.15s ease-in-out !important;
-        border: 2px solid #ccc !important;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.2) !important;
+        border: 2px solid #bbb !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 10px 15px !important;
     }
 
+    /* 2. DE TEKST IN DE KNOP: Vullend, extra groot (34px) en vet */
+    div.stButton > button p,
+    div[data-testid="stButton"] > button p,
+    div.stButton > button div[data-testid="stMarkdownContainer"] p {
+        font-size: 34px !important;
+        font-weight: 900 !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+        text-align: center !important;
+    }
+
+    /* Geselecteerde knop: Knalblauw met witte vette tekst */
     div.stButton > button[kind="primary"] {
         background-color: #0d6efd !important;
-        color: white !important;
-        border: 3px solid #0a58ca !important;
-        transform: scale(1.02);
+        border: 4px solid #084298 !important;
+    }
+    div.stButton > button[kind="primary"] p {
+        color: #ffffff !important;
     }
 
+    /* Niet-geselecteerde knop: Duidelijk leesbaar donkergrijs */
     div.stButton > button[kind="secondary"] {
-        background-color: #f8f9fa !important;
+        background-color: #f1f3f5 !important;
+    }
+    div.stButton > button[kind="secondary"] p {
         color: #212529 !important;
     }
 
-    /* Grote touch-tegels voor OK en NOK */
+    /* 3. OK / NOK stootkussens ook voorzien van vullende tekst */
     div[data-testid="stRadio"] div[role="radiogroup"] > label {
-        padding: 16px 36px !important;
-        font-size: 24px !important;
-        font-weight: 800 !important;
-        border-radius: 12px !important;
-        border: 2px solid #bbb !important;
+        padding: 18px 40px !important;
+        border-radius: 14px !important;
+        border: 3px solid #aaa !important;
         margin-right: 20px !important;
         background-color: #ffffff !important;
-        box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.12) !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label p {
+        font-size: 28px !important;
+        font-weight: 900 !important;
+        margin: 0 !important;
     }
 
+    /* 4. Titels van controlepunten lekker leesbaar vanop afstand */
     h4 {
-        font-size: 26px !important;
-        margin-top: 18px !important;
-        font-weight: bold !important;
-    }
-    
-    div[data-testid="stTextInput"] input {
-        font-size: 20px !important;
-        min-height: 55px !important;
+        font-size: 28px !important;
+        margin-top: 22px !important;
+        font-weight: 900 !important;
     }
 
+    /* 5. Invoervelden voor opmerkingen */
+    div[data-testid="stTextInput"] input {
+        font-size: 22px !important;
+        min-height: 60px !important;
+    }
+
+    /* 6. Cameraknop tekst */
     div[data-testid="stCameraInput"] button {
-        min-height: 70px !important;
-        font-size: 20px !important;
-        font-weight: bold !important;
+        min-height: 75px !important;
+    }
+    div[data-testid="stCameraInput"] button p {
+        font-size: 24px !important;
+        font-weight: 800 !important;
     }
 </style>
 """,
