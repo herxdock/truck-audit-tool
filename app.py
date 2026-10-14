@@ -152,7 +152,6 @@ DB_PATH = "audit_systeem.db"
 # GOOGLE DRIVE CLOUD KOPPELING
 # ==========================================
 @st.cache_resource
-@st.cache_resource
 def get_drive_service():
   """Verbindt met Google Drive via st.secrets met automatische enter-reparatie."""
   if "gcp_service_account" not in st.secrets:
@@ -160,11 +159,11 @@ def get_drive_service():
   try:
     creds_info = dict(st.secrets["gcp_service_account"])
 
-    # DE FIX: zet letterlijke '\n' om naar echte regeleindes voor cryptography
-    if "private_key" in creds_info:
-      creds_info["private_key"] = creds_info["private_key"].replace(
-          "\\n", "\n"
-      )
+    # DE CRUCIALE REPARATIE VOOR HET PEM / SYMBOOL 61 PROBLEEM:
+    pk = str(creds_info.get("private_key", "")).strip()
+    if pk.startswith('"') and pk.endswith('"'):
+      pk = pk[1:-1]
+    creds_info["private_key"] = pk.replace("\\n", "\n")
 
     credentials = service_account.Credentials.from_service_account_info(
         creds_info, scopes=["https://www.googleapis.com/auth/drive"]
@@ -888,7 +887,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
   if audits_compleet_df.empty:
     st.info("Er zijn nog geen audits geregistreerd in Google Drive.")
   else:
-    # Zorg voor unieke rittenoverzicht
     ritten_df = (
         audits_compleet_df[[
             "audit_id",
@@ -977,14 +975,14 @@ elif menu == "📊 Historie & Foto's" and is_admin:
           if pd.notna(it["foto_pad"]) and it["foto_pad"]:
             lokale_foto = os.path.join(FOTO_MAP, str(it["foto_pad"]))
 
-            # 1. Probeer lokaal te laden
+            # 1. Probeer eerst lokaal te laden
             if os.path.exists(lokale_foto):
               st.image(
                   lokale_foto,
                   caption=f"Foto: {it['foto_pad']}",
                   width=350,
               )
-            # 2. Indien gewist door herstart: haal live op uit Google Drive!
+            # 2. Indien gewist door server-herstart: haal direct live op uit Google Drive!
             elif (
                 service
                 and pd.notna(it.get("foto_drive_id"))
@@ -994,7 +992,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
                   service, str(it["foto_drive_id"])
               )
               if foto_bytes:
-                # Bewaar direct lokaal voor de volgende keer
                 with open(lokale_foto, "wb") as f_save:
                   f_save.write(foto_bytes)
                 st.image(
