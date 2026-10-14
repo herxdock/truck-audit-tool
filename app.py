@@ -13,18 +13,18 @@ st.set_page_config(
 )
 
 # ==========================================
-# HEFTRUCK & TABLET STYLING (CSS - EXTRA GROTE TEKST)
+# HEFTRUCK & TABLET STYLING (CSS)
 # ==========================================
 st.markdown(
     """
 <style>
-    /* 1. De knop zelf: hoog en gecentreerd */
+    /* 1. Algemene grote touchknoppen */
     div.stButton > button, 
     div[data-testid="stButton"] > button {
-        min-height: 95px !important;
+        min-height: 90px !important;
         border-radius: 18px !important;
-        margin-bottom: 12px !important;
-        box-shadow: 0 5px 10px rgba(0,0,0,0.2) !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.18) !important;
         border: 2px solid #bbb !important;
         display: flex !important;
         align-items: center !important;
@@ -32,18 +32,17 @@ st.markdown(
         padding: 10px 15px !important;
     }
 
-    /* 2. DE TEKST IN DE KNOP: Vullend, extra groot (34px) en vet */
     div.stButton > button p,
     div[data-testid="stButton"] > button p,
     div.stButton > button div[data-testid="stMarkdownContainer"] p {
-        font-size: 34px !important;
+        font-size: 32px !important;
         font-weight: 900 !important;
         line-height: 1.2 !important;
         margin: 0 !important;
         text-align: center !important;
     }
 
-    /* Geselecteerde knop: Knalblauw met witte vette tekst */
+    /* Geselecteerde standaard knop (Blauw) */
     div.stButton > button[kind="primary"] {
         background-color: #0d6efd !important;
         border: 4px solid #084298 !important;
@@ -52,7 +51,6 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* Niet-geselecteerde knop: Duidelijk leesbaar donkergrijs */
     div.stButton > button[kind="secondary"] {
         background-color: #f1f3f5 !important;
     }
@@ -60,35 +58,56 @@ st.markdown(
         color: #212529 !important;
     }
 
-    /* 3. OK / NOK stootkussens ook voorzien van vullende tekst */
-    div[data-testid="stRadio"] div[role="radiogroup"] > label {
-        padding: 18px 40px !important;
-        border-radius: 14px !important;
-        border: 3px solid #aaa !important;
-        margin-right: 20px !important;
-        background-color: #ffffff !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.12) !important;
+    /* 2. SPECIFIEK VOOR OK & NOK KNOPPEN */
+    /* OK Knop als hij actief is: KNALGROEN */
+    div[class*="st-key-btn_ok_"] button[kind="primary"] {
+        background-color: #198754 !important;
+        border: 4px solid #0f5132 !important;
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] > label p {
-        font-size: 28px !important;
-        font-weight: 900 !important;
-        margin: 0 !important;
+    div[class*="st-key-btn_ok_"] button[kind="primary"] p {
+        color: #ffffff !important;
     }
 
-    /* 4. Titels van controlepunten lekker leesbaar vanop afstand */
-    h4 {
-        font-size: 28px !important;
-        margin-top: 22px !important;
-        font-weight: 900 !important;
+    /* NOK Knop als hij actief is: KNALROOD */
+    div[class*="st-key-btn_nok_"] button[kind="primary"] {
+        background-color: #dc3545 !important;
+        border: 4px solid #842029 !important;
+    }
+    div[class*="st-key-btn_nok_"] button[kind="primary"] p {
+        color: #ffffff !important;
     }
 
-    /* 5. Invoervelden voor opmerkingen */
+    /* 3. VRAAG TITEL IN HET GROOT */
+    .vraag-titel {
+        font-size: 30px !important;
+        font-weight: 900 !important;
+        color: #111827 !important;
+        margin-bottom: 14px !important;
+        line-height: 1.25 !important;
+    }
+
+    /* 4. Invoervelden voor opmerkingen */
     div[data-testid="stTextInput"] input {
         font-size: 22px !important;
         min-height: 60px !important;
+        border-radius: 12px !important;
+        border: 2px solid #ccc !important;
     }
 
-    /* 6. Cameraknop tekst */
+    /* 5. 'Take picture' knop wat compacter maar duidelijk */
+    div[class*="st-key-open_cam_"] button,
+    div[class*="st-key-close_cam_"] button {
+        min-height: 65px !important;
+        border-radius: 14px !important;
+        background-color: #e9ecef !important;
+    }
+    div[class*="st-key-open_cam_"] button p,
+    div[class*="st-key-close_cam_"] button p {
+        font-size: 22px !important;
+        color: #333 !important;
+    }
+
+    /* 6. Cameraknop zelf */
     div[data-testid="stCameraInput"] button {
         min-height: 75px !important;
     }
@@ -171,7 +190,7 @@ def set_setting(key, value):
     conn.commit()
 
 
-# Standaard instellingen (gescheiden vragen per actie)
+# Standaard instellingen
 standaard_vragen = {
     "Load": [
         "1. Laadkwaliteit & gewichtsverdeling",
@@ -207,7 +226,6 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
-# Ophalen uit de database
 vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
@@ -395,7 +413,7 @@ if menu == "📋 Nieuwe Audit":
               st.session_state.sel_truck = truck_naam
               st.rerun()
 
-  # STAP 4: CONTROLEPUNTEN AFHANKELIJK VAN LOAD / UNLOAD
+  # STAP 4: CONTROLEPUNTEN MET GROTE OK/NOK EN OPTIONELE CAMERA
   if (
       st.session_state.sel_actie
       and st.session_state.sel_klant
@@ -408,7 +426,6 @@ if menu == "📋 Nieuwe Audit":
     )
     st.subheader(f"4. Controlepunten voor {st.session_state.sel_actie}")
 
-    # Haal specifiek de vragen op voor de gekozen actie
     actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
 
     if not actieve_vragen:
@@ -418,38 +435,93 @@ if menu == "📋 Nieuwe Audit":
 
     antwoorden = []
     for i, vraag in enumerate(actieve_vragen):
-      st.markdown(f"#### {vraag}")
-      col_a, col_b = st.columns([1, 2])
-      with col_a:
-        status = st.radio(
-            "Status",
-            ["OK", "NOK"],
-            key=f"status_{i}",
-            horizontal=True,
-            index=0,
+      # Elk controlepunt in een duidelijk afgebakend kader
+      with st.container(border=True):
+        st.markdown(
+            f"<div class='vraag-titel'>{vraag}</div>", unsafe_allow_html=True
         )
-      with col_b:
-        comment = st.text_input("Opmerking", key=f"comm_{i}")
 
-      foto = st.camera_input(f"📷 Foto {i+1}", key=f"foto_{i}")
-      foto_bestandsnaam = ""
+        # Huidige status ophalen (standaard 'OK')
+        huidige_status = st.session_state.get(f"status_{i}", "OK")
 
-      if foto is not None:
-        tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_truck = st.session_state.sel_truck.replace(" ", "_")
-        foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
-        foto_pad = os.path.join(FOTO_MAP, foto_bestandsnaam)
-        with open(foto_pad, "wb") as f:
-          f.write(foto.getbuffer())
+        # DIKKE OK EN NOK KNOPPEN NAAST ELKAAR
+        c_ok, c_nok = st.columns(2)
+        with c_ok:
+          is_ok = huidige_status == "OK"
+          if st.button(
+              "🟢 OK",
+              key=f"btn_ok_{i}",
+              use_container_width=True,
+              type="primary" if is_ok else "secondary",
+          ):
+            st.session_state[f"status_{i}"] = "OK"
+            st.rerun()
+        with c_nok:
+          is_nok = huidige_status == "NOK"
+          if st.button(
+              "🔴 NOK",
+              key=f"btn_nok_{i}",
+              use_container_width=True,
+              type="primary" if is_nok else "secondary",
+          ):
+            st.session_state[f"status_{i}"] = "NOK"
+            st.rerun()
 
-      antwoorden.append({
-          "vraag": vraag,
-          "status": status,
-          "commentaar": comment,
-          "foto_pad": foto_bestandsnaam,
-      })
-      st.write("---")
+        # COMMENTAARVAK ONDER DE KNOPPEN
+        comment = st.text_input(
+            "Opmerking (optioneel):",
+            key=f"comm_{i}",
+            placeholder="Typ hier eventuele opmerkingen of schades...",
+        )
 
+        # OPTIONELE CAMERA KNOP ('Take picture')
+        foto_bestandsnaam = st.session_state.get(f"saved_foto_{i}", "")
+        camera_open = st.session_state.get(f"show_cam_{i}", False)
+
+        if not camera_open:
+          label_cam = (
+              "📸 Foto opnieuw nemen"
+              if foto_bestandsnaam
+              else "📷 Take picture (Foto toevoegen)"
+          )
+          if st.button(
+              label_cam, key=f"open_cam_{i}", use_container_width=True
+          ):
+            st.session_state[f"show_cam_{i}"] = True
+            st.rerun()
+        else:
+          # Camera opent alleen als op de knop is gedrukt
+          foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
+          if foto is not None:
+            tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_truck = st.session_state.sel_truck.replace(" ", "_")
+            foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
+            foto_pad = os.path.join(FOTO_MAP, foto_bestandsnaam)
+            with open(foto_pad, "wb") as f:
+              f.write(foto.getbuffer())
+            st.session_state[f"saved_foto_{i}"] = foto_bestandsnaam
+            st.success("✅ Foto succesvol vastgelegd!")
+
+          if st.button(
+              "✖️ Camera sluiten",
+              key=f"close_cam_{i}",
+              use_container_width=True,
+          ):
+            st.session_state[f"show_cam_{i}"] = False
+            st.rerun()
+
+        if foto_bestandsnaam:
+          st.caption(f"📁 Opgeslagen fotobestand: `{foto_bestandsnaam}`")
+
+        antwoorden.append({
+            "vraag": vraag,
+            "status": huidige_status,
+            "commentaar": comment,
+            "foto_pad": foto_bestandsnaam,
+        })
+
+    # OPSLAAN KNOP
+    st.write("<br>", unsafe_allow_html=True)
     if st.button(
         "💾 AUDIT VOLTOOIEN EN OPSLAAN",
         type="primary",
@@ -490,9 +562,17 @@ if menu == "📋 Nieuwe Audit":
         conn.commit()
 
       st.success(f"✅ Audit #{audit_id} succesvol opgeslagen!")
+
+      # Reset alle velden voor de volgende rit
       st.session_state.sel_actie = None
       st.session_state.sel_klant = None
       st.session_state.sel_truck = None
+      for i in range(len(actieve_vragen)):
+        st.session_state.pop(f"status_{i}", None)
+        st.session_state.pop(f"comm_{i}", None)
+        st.session_state.pop(f"show_cam_{i}", None)
+        st.session_state.pop(f"saved_foto_{i}", None)
+        st.session_state.pop(f"foto_{i}", None)
       st.rerun()
 
 # ==========================================
