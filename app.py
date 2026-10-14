@@ -175,6 +175,18 @@ def get_drive_service():
     return None
 
 
+def get_clean_folder_id():
+  """Haalt het folder_id op en schoont eventuele aanhalingstekens en spaties op."""
+  if "gdrive" in st.secrets and "folder_id" in st.secrets["gdrive"]:
+    return (
+        str(st.secrets["gdrive"]["folder_id"])
+        .strip()
+        .replace('"', "")
+        .replace("'", "")
+    )
+  return None
+
+
 def find_drive_file(service, parent_id, filename):
   """Zoekt een specifiek bestand op naam in een Drive map."""
   try:
@@ -347,8 +359,8 @@ init_db()
 def load_all_settings_from_drive():
   """Laadt instellingen uit settings.json op Google Drive indien aanwezig."""
   service = get_drive_service()
-  if service and "gdrive" in st.secrets:
-    parent_id = st.secrets["gdrive"]["folder_id"]
+  parent_id = get_clean_folder_id()
+  if service and parent_id:
     file_id = find_drive_file(service, parent_id, "settings.json")
     if file_id:
       content = read_drive_file_bytes(service, file_id)
@@ -385,8 +397,8 @@ def set_setting(key, value):
     conn.commit()
 
   service = get_drive_service()
-  if service and "gdrive" in st.secrets:
-    parent_id = st.secrets["gdrive"]["folder_id"]
+  parent_id = get_clean_folder_id()
+  if service and parent_id:
     drive_settings = load_all_settings_from_drive()
     drive_settings[key] = value
     save_or_update_drive_file(
@@ -780,11 +792,11 @@ if menu == "📋 Nieuwe Audit":
 
       # 2. Permanent opslaan in Google Drive (Direct en betrouwbaar)
       service = get_drive_service()
+      parent_folder_id = get_clean_folder_id()
       drive_gelukt = False
-      if service and "gdrive" in st.secrets:
-        try:
-          parent_folder_id = st.secrets["gdrive"]["folder_id"]
 
+      if service and parent_folder_id:
+        try:
           # A. Maak een submap aan voor dit dossier
           submap_naam = f"{now_str.replace(':', '').replace(' ', '_')}_{st.session_state.sel_actie}_{st.session_state.sel_klant}_{st.session_state.sel_truck}_{huidige_gebruiker}".replace(
               " ", "_"
@@ -895,10 +907,10 @@ elif menu == "📊 Historie & Foto's" and is_admin:
   st.title("📊 Historisch Overzicht & Downloads")
 
   service = get_drive_service()
+  parent_folder_id = get_clean_folder_id()
   audits_compleet_df = pd.DataFrame()
 
-  if service and "gdrive" in st.secrets:
-    parent_folder_id = st.secrets["gdrive"]["folder_id"]
+  if service and parent_folder_id:
     master_file_id = find_drive_file(
         service, parent_folder_id, "master_audit_database.csv"
     )
@@ -1044,7 +1056,38 @@ elif menu == "📊 Historie & Foto's" and is_admin:
 # ==========================================
 elif menu == "⚙️ Beheer & Instellingen" and is_admin:
   st.title("⚙️ Beheerpaneel")
-  st.caption("Beheer trucks, klanten, koppelingen en controlepunten.")
+
+  # DIRECTE SYNCHRONISATIE KNOP
+  col_sync1, col_sync2 = st.columns([2, 1])
+  with col_sync1:
+    st.caption("Beheer trucks, klanten, koppelingen en controlepunten.")
+  with col_sync2:
+    if st.button(
+        "☁️ Synchroniseer instellingen naar Google Drive",
+        use_container_width=True,
+    ):
+      service = get_drive_service()
+      parent_id = get_clean_folder_id()
+      if not service or not parent_id:
+        st.error("Google Drive verbinding of map-ID ontbreekt!")
+      else:
+        huidige_data = {
+            "vragen_per_actie": vragen_per_actie,
+            "trucks": trucks_lijst,
+            "klanten": klanten_lijst,
+            "klant_trucks": klant_trucks_map,
+        }
+        f_id = save_or_update_drive_file(
+            service,
+            parent_id,
+            "settings.json",
+            json.dumps(huidige_data, indent=2).encode("utf-8"),
+            "application/json",
+        )
+        if f_id:
+          st.success("✅ 'settings.json' succesvol opgeslagen in Google Drive!")
+        else:
+          st.error("Opslaan van settings.json naar Google Drive mislukt.")
 
   tab1, tab2, tab3, tab4 = st.tabs([
       "🔗 Klanten & Trucks Koppelen",
