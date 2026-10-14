@@ -513,11 +513,25 @@ if menu == "📋 Nieuwe Audit":
           foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
           if foto is not None:
             tijd_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_truck = st.session_state.sel_truck.replace(" ", "_")
+            # Veilige naam maken zonder vreemde tekens of schuine strepen
+            safe_truck = (
+                "".join(
+                    c
+                    for c in str(st.session_state.sel_truck)
+                    if c.isalnum() or c in (" ", "_", "-")
+                )
+                .strip()
+                .replace(" ", "_")
+            )
             foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
             foto_pad = os.path.join(FOTO_MAP, foto_bestandsnaam)
+
+            # GARANDEER dat de map bestaat vlak voor het wegschrijven:
+            os.makedirs(FOTO_MAP, exist_ok=True)
+
             with open(foto_pad, "wb") as f:
               f.write(foto.getbuffer())
+
             st.session_state[f"saved_foto_{i}"] = foto_bestandsnaam
             st.success("✅ Foto succesvol vastgelegd!")
 
