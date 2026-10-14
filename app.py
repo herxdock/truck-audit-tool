@@ -224,32 +224,40 @@ class AuditPDF(FPDF):
     self.titel_rapport = titel_rapport
 
   def header(self):
+    # 1. Logo links plaatsen
+    heeft_logo = False
     if os.path.exists("logo.png"):
       try:
         self.image("logo.png", 10, 8, 30)
-        self.set_xy(45, 10)
+        heeft_logo = True
       except Exception:
-        self.set_xy(10, 10)
-    else:
-      self.set_xy(10, 10)
+        heeft_logo = False
 
-    self.set_font("helvetica", "B", 14)
+    # Startpositie voor de titel: naast het logo (x=44) of vanaf de kantlijn (x=10)
+    x_tekst = 44 if heeft_logo else 10
+    self.set_xy(x_tekst, 11)
+
+    # 2. Titel links naast het logo
+    self.set_font("helvetica", "B", 12)
     self.set_text_color(30, 41, 59)
-    self.cell(0, 8, self.titel_rapport, border=False, align="L")
-    self.ln(6)
-    self.set_font("helvetica", "", 8)
+    self.cell(95, 7, self.titel_rapport, border=False, align="L")
+
+    # 3. DATUM EN TIJD HELEMAAL RECHTS OP DEZELFDE HOOGTE
+    self.set_font("helvetica", "", 9)
     self.set_text_color(100, 116, 139)
     self.cell(
         0,
-        5,
-        f"Gegenereerd op: {datetime.now().strftime('%d-%m-%Y %H:%M')}",
+        7,
+        f"Gegenereerd: {datetime.now().strftime('%d-%m-%Y %H:%M')}",
         border=False,
-        align="L",
+        align="R",
     )
-    self.ln(10)
+
+    # Scheidingslijn onder het logo en de header
+    self.set_xy(10, 24)
     self.set_draw_color(203, 213, 225)
-    self.line(10, self.get_y(), 200, self.get_y())
-    self.ln(5)
+    self.line(10, 24, 200, 24)
+    self.ln(4)
 
   def footer(self):
     self.set_y(-15)
