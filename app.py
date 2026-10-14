@@ -152,12 +152,20 @@ DB_PATH = "audit_systeem.db"
 # GOOGLE DRIVE CLOUD KOPPELING
 # ==========================================
 @st.cache_resource
+@st.cache_resource
 def get_drive_service():
-  """Verbindt met Google Drive via st.secrets."""
+  """Verbindt met Google Drive via st.secrets met automatische enter-reparatie."""
   if "gcp_service_account" not in st.secrets:
     return None
   try:
     creds_info = dict(st.secrets["gcp_service_account"])
+
+    # DE FIX: zet letterlijke '\n' om naar echte regeleindes voor cryptography
+    if "private_key" in creds_info:
+      creds_info["private_key"] = creds_info["private_key"].replace(
+          "\\n", "\n"
+      )
+
     credentials = service_account.Credentials.from_service_account_info(
         creds_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
