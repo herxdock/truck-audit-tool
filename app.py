@@ -18,7 +18,7 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* 1. Knoppen extreem groot en touch-vriendelijk maken */
+    /* Grote knoppen voor heftruckbediening */
     div.stButton > button {
         min-height: 85px !important;
         font-size: 24px !important;
@@ -30,7 +30,6 @@ st.markdown(
         border: 2px solid #ccc !important;
     }
 
-    /* Geselecteerde knop (Primary): Knalblauw met duidelijke rand */
     div.stButton > button[kind="primary"] {
         background-color: #0d6efd !important;
         color: white !important;
@@ -38,13 +37,12 @@ st.markdown(
         transform: scale(1.02);
     }
 
-    /* Niet geselecteerde knop (Secondary): Rustig grijs/wit */
     div.stButton > button[kind="secondary"] {
         background-color: #f8f9fa !important;
         color: #212529 !important;
     }
 
-    /* 2. OK / NOK radio buttons ombouwen naar grote stootkussens */
+    /* Grote touch-tegels voor OK en NOK */
     div[data-testid="stRadio"] div[role="radiogroup"] > label {
         padding: 16px 36px !important;
         font-size: 24px !important;
@@ -56,7 +54,6 @@ st.markdown(
         box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
     }
 
-    /* 3. Vragen titels en tekstvakken vergroten */
     h4 {
         font-size: 26px !important;
         margin-top: 18px !important;
@@ -68,7 +65,6 @@ st.markdown(
         min-height: 55px !important;
     }
 
-    /* 4. Cameraknop vergroten */
     div[data-testid="stCameraInput"] button {
         min-height: 70px !important;
         font-size: 20px !important;
@@ -149,14 +145,24 @@ def set_setting(key, value):
     conn.commit()
 
 
-# Standaard instellingen
-standaard_vragen = [
-    "1. Algemene laadkwaliteit",
-    "2. Zichtbare schade aan goederen/trailer",
-    "3. Zekering / Spandraad / Securing beams",
-    "4. Netheid van de laadruimte",
-    "5. Correcte documentatie / Vrachtbrief",
-]
+# Standaard instellingen (gescheiden vragen per actie)
+standaard_vragen = {
+    "Load": [
+        "1. Laadkwaliteit & gewichtsverdeling",
+        "2. Zekering / Spanbanden / Balken geplaatst",
+        "3. Geen zichtbare laadschade aan goederen",
+        "4. Sluiten & vergrendelen van de trailer",
+        "5. Vrachtdocumenten getekend en meegegeven",
+    ],
+    "Unload": [
+        "1. Visuele controle bij openen trailer (verschuivingen?)",
+        "2. Schade aan binnenkomende goederen",
+        "3. Trailer vloer en wanden geïnspecteerd op schade",
+        "4. Netheid van de lege laadruimte (veegschoon)",
+        "5. Vrachtbrief / CMR afgetekend met eventuele voorbehouden",
+    ],
+}
+
 standaard_trucks = [
     "Truck 01",
     "Truck 02",
@@ -175,7 +181,8 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
-vragen_lijst = get_setting("vragen", standaard_vragen)
+# Ophalen uit de database
+vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
@@ -287,7 +294,7 @@ if menu == "📋 Nieuwe Audit":
         st.session_state.sel_truck = None
         st.rerun()
 
-  # STAP 1: GROTE ACTIE KNOPPEN (2 NAAST ELKAAR)
+  # STAP 1: GROTE ACTIE KNOPPEN
   st.subheader("1. Kies Actie")
   c1, c2 = st.columns(2)
   with c1:
@@ -309,7 +316,7 @@ if menu == "📋 Nieuwe Audit":
       st.session_state.sel_actie = "Unload"
       st.rerun()
 
-  # STAP 2: GROTE KLANT KNOPPEN (2 PER RIJ VOOR 8-INCH TABLET)
+  # STAP 2: GROTE KLANT KNOPPEN
   if st.session_state.sel_actie:
     st.write("---")
     st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
@@ -330,7 +337,7 @@ if menu == "📋 Nieuwe Audit":
             st.session_state.sel_truck = None
             st.rerun()
 
-  # STAP 3: GEFILTERDE TRUCK KNOPPEN (2 PER RIJ)
+  # STAP 3: GEFILTERDE TRUCK KNOPPEN
   if st.session_state.sel_klant:
     st.write("---")
     st.subheader(f"3. Kies Truck ({st.session_state.sel_klant})")
@@ -362,7 +369,7 @@ if menu == "📋 Nieuwe Audit":
               st.session_state.sel_truck = truck_naam
               st.rerun()
 
-  # STAP 4: CONTROLEPUNTEN & CAMERA
+  # STAP 4: CONTROLEPUNTEN AFHANKELIJK VAN LOAD / UNLOAD
   if (
       st.session_state.sel_actie
       and st.session_state.sel_klant
@@ -370,13 +377,21 @@ if menu == "📋 Nieuwe Audit":
   ):
     st.write("---")
     st.info(
-        f"Gekozen rit: **{st.session_state.sel_actie}** |"
+        f"Gekozen: **{st.session_state.sel_actie}** |"
         f" **{st.session_state.sel_klant}** | **{st.session_state.sel_truck}**"
     )
-    st.subheader("4. Controle & Foto's")
+    st.subheader(f"4. Controlepunten voor {st.session_state.sel_actie}")
+
+    # Haal specifiek de vragen op voor de gekozen actie
+    actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
+
+    if not actieve_vragen:
+      st.warning(
+          f"Geen controlepunten geconfigureerd voor '{st.session_state.sel_actie}'."
+      )
 
     antwoorden = []
-    for i, vraag in enumerate(vragen_lijst):
+    for i, vraag in enumerate(actieve_vragen):
       st.markdown(f"#### {vraag}")
       col_a, col_b = st.columns([1, 2])
       with col_a:
@@ -570,9 +585,10 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
       "🔗 Klanten & Trucks Koppelen",
       "🏢 Klanten",
       "🚛 Trucks",
-      "❓ Vragen",
+      "❓ Vragen per Actie",
   ])
 
+  # --- TAB 1: KOPPELINGEN ---
   with tab1:
     st.subheader("Koppel vrachtwagens aan een klant")
     gekozen_klant = st.selectbox("Kies Klant", klanten_lijst)
@@ -593,6 +609,7 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
       )
       st.rerun()
 
+  # --- TAB 2: KLANTEN ---
   with tab2:
     nieuwe_klant = st.text_input("Nieuwe klant toevoegen")
     if st.button("Voeg klant toe"):
@@ -612,6 +629,7 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve klanten:", klanten_lijst)
 
+  # --- TAB 3: TRUCKS ---
   with tab3:
     nieuwe_truck = st.text_input("Nieuwe vrachtwagen toevoegen")
     if st.button("Voeg truck toe"):
@@ -628,18 +646,35 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve trucks:", trucks_lijst)
 
+  # --- TAB 4: VRAGEN PER ACTIE (LOAD / UNLOAD) ---
   with tab4:
-    nieuwe_vraag = st.text_input("Nieuw controlepunt toevoegen")
-    if st.button("Voeg vraag toe"):
-      if nieuwe_vraag and nieuwe_vraag not in vragen_lijst:
-        vragen_lijst.append(nieuwe_vraag)
-        set_setting("vragen", vragen_lijst)
+    st.subheader("Controlepunten beheren per Actie")
+    actie_keuze = st.radio(
+        "Kies welke vragenset je wilt aanpassen:",
+        ["Load", "Unload"],
+        horizontal=True,
+    )
+
+    vragen_deze_actie = vragen_per_actie.get(actie_keuze, [])
+
+    nieuwe_vraag = st.text_input(f"Nieuw controlepunt toevoegen voor {actie_keuze}")
+    if st.button(f"Voeg vraag toe aan {actie_keuze}"):
+      if nieuwe_vraag and nieuwe_vraag not in vragen_deze_actie:
+        vragen_deze_actie.append(nieuwe_vraag)
+        vragen_per_actie[actie_keuze] = vragen_deze_actie
+        set_setting("vragen_per_actie", vragen_per_actie)
         st.rerun()
 
-    del_vraag = st.selectbox("Verwijder een vraag", ["---"] + vragen_lijst)
-    if st.button("Verwijder vraag"):
+    del_vraag = st.selectbox(
+        f"Verwijder een vraag uit {actie_keuze}", ["---"] + vragen_deze_actie
+    )
+    if st.button(f"Verwijder vraag uit {actie_keuze}"):
       if del_vraag != "---":
-        vragen_lijst.remove(del_vraag)
-        set_setting("vragen", vragen_lijst)
+        vragen_deze_actie.remove(del_vraag)
+        vragen_per_actie[actie_keuze] = vragen_deze_actie
+        set_setting("vragen_per_actie", vragen_per_actie)
         st.rerun()
-    st.write("Actieve vragen:", vragen_lijst)
+
+    st.write(f"**Actieve controlepunten voor {actie_keuze}:**")
+    for idx, v in enumerate(vragen_deze_actie):
+      st.write(f"- {v}")
