@@ -7,9 +7,76 @@ import zipfile
 import pandas as pd
 import streamlit as st
 
-# Pagina instellingen (breed voor tablet)
+# Pagina instellingen
 st.set_page_config(
     page_title="Truck Audit Systeem", page_icon="🚛", layout="wide"
+)
+
+# ==========================================
+# HEFTRUCK & TABLET STYLING (CSS)
+# ==========================================
+st.markdown(
+    """
+<style>
+    /* 1. Knoppen extreem groot en touch-vriendelijk maken */
+    div.stButton > button {
+        min-height: 85px !important;
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        border-radius: 16px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.18) !important;
+        transition: all 0.15s ease-in-out !important;
+        border: 2px solid #ccc !important;
+    }
+
+    /* Geselecteerde knop (Primary): Knalblauw met duidelijke rand */
+    div.stButton > button[kind="primary"] {
+        background-color: #0d6efd !important;
+        color: white !important;
+        border: 3px solid #0a58ca !important;
+        transform: scale(1.02);
+    }
+
+    /* Niet geselecteerde knop (Secondary): Rustig grijs/wit */
+    div.stButton > button[kind="secondary"] {
+        background-color: #f8f9fa !important;
+        color: #212529 !important;
+    }
+
+    /* 2. OK / NOK radio buttons ombouwen naar grote stootkussens */
+    div[data-testid="stRadio"] div[role="radiogroup"] > label {
+        padding: 16px 36px !important;
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        border-radius: 12px !important;
+        border: 2px solid #bbb !important;
+        margin-right: 20px !important;
+        background-color: #ffffff !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
+    }
+
+    /* 3. Vragen titels en tekstvakken vergroten */
+    h4 {
+        font-size: 26px !important;
+        margin-top: 18px !important;
+        font-weight: bold !important;
+    }
+    
+    div[data-testid="stTextInput"] input {
+        font-size: 20px !important;
+        min-height: 55px !important;
+    }
+
+    /* 4. Cameraknop vergroten */
+    div[data-testid="stCameraInput"] button {
+        min-height: 70px !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
+    }
+</style>
+""",
+    unsafe_allow_html=True,
 )
 
 FOTO_MAP = "audit_fotos"
@@ -100,7 +167,6 @@ standaard_trucks = [
 ]
 standaard_klanten = ["BMW", "Toyota", "Scania", "Grieshaber", "TS-Lux"]
 
-# Standaard koppeling tussen klant en trucks
 standaard_klant_trucks = {
     "BMW": ["Truck 01", "Truck 02"],
     "Toyota": ["Truck 02", "Truck 03"],
@@ -146,7 +212,7 @@ if "logged_in" not in st.session_state:
   st.session_state.user = None
 
 if not st.session_state.logged_in:
-  col_l, col_center, col_r = st.columns([1, 1.8, 1])
+  col_l, col_center, col_r = st.columns([1, 2, 1])
   with col_center:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.title("🔐 Login Truck Audit")
@@ -200,7 +266,6 @@ else:
 if menu == "📋 Nieuwe Audit":
   st.title("📋 Nieuwe Truck Audit")
 
-  # Session state voor selecties initialiseren
   if "sel_actie" not in st.session_state:
     st.session_state.sel_actie = None
   if "sel_klant" not in st.session_state:
@@ -208,7 +273,6 @@ if menu == "📋 Nieuwe Audit":
   if "sel_truck" not in st.session_state:
     st.session_state.sel_truck = None
 
-  # Knop om tussentijds te resetten
   col_head1, col_head2 = st.columns([3, 1])
   with col_head1:
     st.caption(
@@ -217,13 +281,13 @@ if menu == "📋 Nieuwe Audit":
     )
   with col_head2:
     if st.session_state.sel_actie is not None:
-      if st.button("🔄 Selectie Resetten", use_container_width=True):
+      if st.button("🔄 Reset Selectie", use_container_width=True):
         st.session_state.sel_actie = None
         st.session_state.sel_klant = None
         st.session_state.sel_truck = None
         st.rerun()
 
-  # STAP 1: GROTE ACTIE KNOPPEN (LOAD / UNLOAD)
+  # STAP 1: GROTE ACTIE KNOPPEN (2 NAAST ELKAAR)
   st.subheader("1. Kies Actie")
   c1, c2 = st.columns(2)
   with c1:
@@ -245,46 +309,43 @@ if menu == "📋 Nieuwe Audit":
       st.session_state.sel_actie = "Unload"
       st.rerun()
 
-  # STAP 2: GROTE KLANT KNOPPEN (Alleen zichtbaar als actie is gekozen)
+  # STAP 2: GROTE KLANT KNOPPEN (2 PER RIJ VOOR 8-INCH TABLET)
   if st.session_state.sel_actie:
     st.write("---")
-    st.subheader(f"2. Kies Klant voor {st.session_state.sel_actie}")
+    st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
 
-    # Toon klanten in rijen van 3 grote knoppen
-    kolommen_per_rij = 3
+    kolommen_per_rij = 2
     for i in range(0, len(klanten_lijst), kolommen_per_rij):
       cols = st.columns(kolommen_per_rij)
       for j, klant_naam in enumerate(klanten_lijst[i : i + kolommen_per_rij]):
         with cols[j]:
           is_active = st.session_state.sel_klant == klant_naam
           if st.button(
-              klant_naam,
+              f"🏢 {klant_naam}",
               key=f"btn_k_{klant_naam}",
               use_container_width=True,
               type="primary" if is_active else "secondary",
           ):
             st.session_state.sel_klant = klant_naam
-            # Reset truckkeuze als de klant wisselt
             st.session_state.sel_truck = None
             st.rerun()
 
-  # STAP 3: GEFILTERDE TRUCK KEUZE (Alleen zichtbaar als klant is gekozen)
+  # STAP 3: GEFILTERDE TRUCK KNOPPEN (2 PER RIJ)
   if st.session_state.sel_klant:
     st.write("---")
-    st.subheader(f"3. Kies Truck voor {st.session_state.sel_klant}")
+    st.subheader(f"3. Kies Truck ({st.session_state.sel_klant})")
 
-    # Haal alleen trucks op die aan DEZE klant gekoppeld zijn
     gekoppelde_trucks = klant_trucks_map.get(
         st.session_state.sel_klant, trucks_lijst
     )
 
     if not gekoppelde_trucks:
       st.warning(
-          f"⚠️ Er zijn in het beheerpaneel nog geen trucks gekoppeld aan"
-          f" '{st.session_state.sel_klant}'."
+          f"⚠️ Geen trucks gekoppeld aan '{st.session_state.sel_klant}' in het"
+          " beheerpaneel."
       )
     else:
-      kolommen_trucks = 3
+      kolommen_trucks = 2
       for i in range(0, len(gekoppelde_trucks), kolommen_trucks):
         cols = st.columns(kolommen_trucks)
         for j, truck_naam in enumerate(
@@ -301,17 +362,16 @@ if menu == "📋 Nieuwe Audit":
               st.session_state.sel_truck = truck_naam
               st.rerun()
 
-  # STAP 4: DE VRAGENLIJST & CAMERA (Zichtbaar zodra alles gekozen is)
+  # STAP 4: CONTROLEPUNTEN & CAMERA
   if (
       st.session_state.sel_actie
       and st.session_state.sel_klant
       and st.session_state.sel_truck
   ):
     st.write("---")
-    st.success(
-        f"Geselecteerd: **{st.session_state.sel_actie}** | Klant:"
-        f" **{st.session_state.sel_klant}** | Truck:"
-        f" **{st.session_state.sel_truck}**"
+    st.info(
+        f"Gekozen rit: **{st.session_state.sel_actie}** |"
+        f" **{st.session_state.sel_klant}** | **{st.session_state.sel_truck}**"
     )
     st.subheader("4. Controle & Foto's")
 
@@ -328,9 +388,9 @@ if menu == "📋 Nieuwe Audit":
             index=0,
         )
       with col_b:
-        comment = st.text_input("Opmerking (optioneel)", key=f"comm_{i}")
+        comment = st.text_input("Opmerking", key=f"comm_{i}")
 
-      foto = st.camera_input(f"Foto voor punt {i+1}", key=f"foto_{i}")
+      foto = st.camera_input(f"📷 Foto {i+1}", key=f"foto_{i}")
       foto_bestandsnaam = ""
 
       if foto is not None:
@@ -349,7 +409,11 @@ if menu == "📋 Nieuwe Audit":
       })
       st.write("---")
 
-    if st.button("💾 Audit Opslaan", type="primary", use_container_width=True):
+    if st.button(
+        "💾 AUDIT VOLTOOIEN EN OPSLAAN",
+        type="primary",
+        use_container_width=True,
+    ):
       with get_db() as conn:
         c = conn.cursor()
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -385,7 +449,6 @@ if menu == "📋 Nieuwe Audit":
         conn.commit()
 
       st.success(f"✅ Audit #{audit_id} succesvol opgeslagen!")
-      # Reset selecties voor de volgende rit
       st.session_state.sel_actie = None
       st.session_state.sel_klant = None
       st.session_state.sel_truck = None
@@ -510,15 +573,9 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
       "❓ Vragen",
   ])
 
-  # --- TAB 1: KOPPELINGEN TUSSEN KLANT EN TRUCKS ---
   with tab1:
-    st.subheader("Koppel vrachtwagens aan een specifieke klant")
-    st.caption(
-        "Alleen de trucks die je hier selecteert worden zichtbaar wanneer deze"
-        " klant wordt gekozen."
-    )
-
-    gekozen_klant = st.selectbox("Kies Klant om te configureren", klanten_lijst)
+    st.subheader("Koppel vrachtwagens aan een klant")
+    gekozen_klant = st.selectbox("Kies Klant", klanten_lijst)
     huidige_gekoppelde = klant_trucks_map.get(gekozen_klant, [])
 
     geselecteerde_trucks = st.multiselect(
@@ -527,16 +584,15 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         default=[t for t in huidige_gekoppelde if t in trucks_lijst],
     )
 
-    if st.button("💾 Koppeling Opslaan voor deze klant", type="primary"):
+    if st.button("💾 Koppeling Opslaan", type="primary"):
       klant_trucks_map[gekozen_klant] = geselecteerde_trucks
       set_setting("klant_trucks", klant_trucks_map)
       st.success(
-          f"Instellingen opgeslagen! {len(geselecteerde_trucks)} trucks"
-          f" gekoppeld aan {gekozen_klant}."
+          f"Opgeslagen! {len(geselecteerde_trucks)} trucks gekoppeld aan"
+          f" {gekozen_klant}."
       )
       st.rerun()
 
-  # --- TAB 2: KLANTEN BEHEREN ---
   with tab2:
     nieuwe_klant = st.text_input("Nieuwe klant toevoegen")
     if st.button("Voeg klant toe"):
@@ -556,7 +612,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve klanten:", klanten_lijst)
 
-  # --- TAB 3: TRUCKS BEHEREN ---
   with tab3:
     nieuwe_truck = st.text_input("Nieuwe vrachtwagen toevoegen")
     if st.button("Voeg truck toe"):
@@ -573,7 +628,6 @@ elif menu == "⚙️ Beheer & Instellingen" and is_admin:
         st.rerun()
     st.write("Actieve trucks:", trucks_lijst)
 
-  # --- TAB 4: VRAGEN BEHEREN ---
   with tab4:
     nieuwe_vraag = st.text_input("Nieuw controlepunt toevoegen")
     if st.button("Voeg vraag toe"):
