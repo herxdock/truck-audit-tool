@@ -40,7 +40,7 @@ st.markdown(
         padding: 14px 18px !important;
         border-radius: 14px !important;
         margin-bottom: 20px !important;
-        line-height: 1.3 !important;
+        line-line: 1.3 !important;
     }
 
     /* 2. GROTE TOUCHKNOPPEN */
@@ -143,7 +143,6 @@ def get_supabase() -> Client:
   return None
 
 
-# Helper functies voor instellingen via Supabase
 def get_setting(key, default):
   client = get_supabase()
   if client:
@@ -579,10 +578,10 @@ if menu == "📋 Nieuwe Audit":
       st.rerun()
 
 # ==========================================
-# ONDERDEEL 2: HISTORIE (LIVESTREAM UIT SUPABASE)
+# ONDERDEEL 2: HISTORIE, KPI'S & RAPPORTAGE
 # ==========================================
 elif menu == "📊 Historie & Foto's" and is_admin:
-  st.title("📊 Historisch Overzicht & Downloads")
+  st.title("📊 Kwaliteitscontrole & Rapportage")
 
   client = get_supabase()
   ritten_lijst = []
@@ -623,65 +622,203 @@ elif menu == "📊 Historie & Foto's" and is_admin:
       st.error(f"Fout bij ophalen historie: {e}")
 
   if not ritten_lijst:
-    st.info("Er zijn nog geen audits geregistreerd in de cloud.")
+    st.info(
+        "Er zijn nog geen audits geregistreerd in de cloud. Voer eerst een"
+        " audit uit!"
+    )
   else:
     ritten_df = pd.DataFrame(ritten_lijst)
     compleet_df = pd.DataFrame(items_lijst)
 
-    col1, col2 = st.columns(2)
-    with col1:
-      filter_truck = st.multiselect(
-          "Filter op Truck",
-          options=ritten_df["truck"].unique(),
-          default=ritten_df["truck"].unique(),
+    # Converteer timestamp naar datumformaat voor betrouwbare datumselectie
+    try:
+      ritten_df["datum"] = pd.to_datetime(ritten_df["timestamp"]).dt.date
+    except Exception:
+      ritten_df["datum"] = datetime.now().date()
+
+    # --- 1. FILTERPANEEL ---
+    st.subheader("🔍 Filters & Periode Selectie")
+
+    col_datum1, col_datum2 = st.columns(2)
+    min_db_datum = ritten_df["datum"].min()
+    max_db_datum = ritten_df["datum"].max()
+
+    with col_datum1:
+      van_datum = st.date_input("📅 Van datum:", value=min_db_datum)
+    with col_datum2:
+      tot_datum = st.date_input("📅 Tot en met datum:", value=max_db_datum)
+
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+      filter_actie = st.multiselect(
+          "Filter op Actie:",
+          options=sorted(ritten_df["actie"].unique().tolist()),
+          default=ritten_df["actie"].unique().tolist(),
       )
-    with col2:
+    with col_f2:
       filter_klant = st.multiselect(
-          "Filter op Klant",
-          options=ritten_df["klant"].unique(),
-          default=ritten_df["klant"].unique(),
+          "Filter op Klant:",
+          options=sorted(ritten_df["klant"].unique().tolist()),
+          default=ritten_df["klant"].unique().tolist(),
+      )
+    with col_f3:
+      filter_truck = st.multiselect(
+          "Filter op Truck:",
+          options=sorted(ritten_df["truck"].unique().tolist()),
+          default=ritten_df["truck"].unique().tolist(),
       )
 
-    gefilterde_ritten = ritten_df[
-        ritten_df["truck"].isin(filter_truck)
-        & ritten_df["klant"].isin(filter_klant)
-    ]
-
-    st.subheader("📥 Export Opties")
-    csv_data = compleet_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📄 Download Data als CSV (Excel)",
-        data=csv_data,
-        file_name=f"audits_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True,
+    alleen_nok = st.checkbox(
+        "⚠️ Toon alleen audits met afwijking / schade (minstens één NOK)",
+        value=False,
     )
 
+    # Toepassen van de filters
+    mask = (
+        (ritten_df["datum"] >= van_datum)
+        & (ritten_df["datum"] <= tot_datum)
+        & (ritten_df["actie"].isin(filter_actie))
+        & (ritten_df["klant"].isin(filter_klant))
+        & (ritten_df["truck"].isin(filter_truck))
+    )
+    gefilterde_ritten = ritten_df[mask]
+
+    # Indien 'alleen NOK' aangevinkt staat
+    if alleen_nok:
+      nok_audit_ids = compleet_df[compleet_df["status"] == "NOK"][
+          "audit_id"
+      ].unique()
+      gefilterde_ritten = gefilterde_ritten[
+          gefilterde_ritten["audit_id"].isin(nok_audit_ids)
+      ]
+
+    # --- 2. KPI METRICS (SCOREBORD) ---
     st.write("---")
-    st.subheader("Rittenoverzicht (Live uit Supabase Cloud)")
+    totaal_aantal = len(gefilterde_ritten)
 
-    for _, rit in gefilterde_ritten.iterrows():
-      titel = f"Audit #{rit['audit_id']} | {rit['truck']} ({rit['klant']}) - {rit['actie']} om {rit['timestamp']}"
-      with st.expander(titel):
-        st.write(f"**Inspecteur:** {rit['auditor']}")
+    if totaal_aantal == 0:
+      st.warning(
+          "Geen audits gevonden voor deze specifieke filter-combinatie."
+      )
+    else:
+      # Items die horen bij de gefilterde ritten
+      gefilterde_items = compleet_df[
+          compleet_df["audit_id"].isin(gefilterde_ritten["audit_id"])
+      ]
 
-        items = compleet_df[compleet_df["audit_id"] == rit["audit_id"]]
+      # Bereken statistieken
+      ritten_met_nok_aantal = gefilterde_items[
+          gefilterde_items["status"] == "NOK"
+      ]["audit_id"].nunique()
+      ritten_100_ok_aantal = totaal_aantal - ritten_met_nok_aantal
+      pct_ok = round((ritten_100_ok_aantal / totaal_aantal) * 100, 1)
+      totaal_fotos = gefilterde_items[gefilterde_items["foto_url"] != ""][
+          "foto_url"
+      ].nunique()
 
-        for _, it in items.iterrows():
-          kleur = "🟢" if it["status"] == "OK" else "🔴"
-          st.markdown(
-              f"**{kleur} {it['vraag']}** — Status: **{it['status']}**"
-          )
-          if pd.notna(it["commentaar"]) and it["commentaar"]:
-            st.write(f"💬 Opmerking: *{it['commentaar']}*")
+      # Toon 4 KPI kaarten
+      kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+      kpi1.metric("📋 Totaal Audits", f"{totaal_aantal}")
+      kpi2.metric("🟢 100% Goedgekeurd", f"{ritten_100_ok_aantal}", f"{pct_ok}%")
+      kpi3.metric(
+          "🔴 Met Afwijking (NOK)",
+          f"{ritten_met_nok_aantal}",
+          f"-{round(100 - pct_ok, 1)}%" if ritten_met_nok_aantal > 0 else "0%",
+      )
+      kpi4.metric("📷 Gemaakte Foto's", f"{totaal_fotos}")
 
-          if pd.notna(it["foto_url"]) and it["foto_url"]:
-            st.image(
-                it["foto_url"],
-                caption=f"Foto inspectiepunt",
-                width=350,
+      # --- 3. RAPPORT DOWNLOADS (EXECUTIVE & DETAIL) ---
+      st.write("---")
+      st.subheader("📥 Export & Rapportages")
+      down_col1, down_col2 = st.columns(2)
+
+      # A. Management Samenvatting (1 rij per audit)
+      samenvatting_rijen = []
+      for _, rit_info in gefilterde_ritten.iterrows():
+        a_id = rit_info["audit_id"]
+        sub_items = gefilterde_items[gefilterde_items["audit_id"] == a_id]
+        aantal_ok = len(sub_items[sub_items["status"] == "OK"])
+        aantal_nok = len(sub_items[sub_items["status"] == "NOK"])
+        heeft_nok = aantal_nok > 0
+
+        # Alle opmerkingen samenvoegen tot 1 nette leesbare tekst
+        opmerkingen_tekst = " | ".join([
+            f"{r['vraag']}: {r['commentaar']}"
+            for _, r in sub_items.iterrows()
+            if pd.notna(r["commentaar"]) and str(r["commentaar"]).strip() != ""
+        ])
+
+        samenvatting_rijen.append({
+            "Audit ID": a_id,
+            "Tijdstip": rit_info["timestamp"],
+            "Actie": rit_info["actie"],
+            "Klant": rit_info["klant"],
+            "Truck": rit_info["truck"],
+            "Inspecteur": rit_info["auditor"],
+            "Eindoordeel": "⚠️ AFWIJKING" if heeft_nok else "✅ 100% OK",
+            "Aantal OK": aantal_ok,
+            "Aantal NOK": aantal_nok,
+            "Opmerkingen": opmerkingen_tekst,
+        })
+
+      df_management_rapport = pd.DataFrame(samenvatting_rijen)
+      csv_management = df_management_rapport.to_csv(index=False).encode("utf-8")
+
+      with down_col1:
+        st.download_button(
+            label="📄 Download Samenvatting (1 regel per rit)",
+            data=csv_management,
+            file_name=f"audit_samenvatting_{van_datum}_tot_{tot_datum}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+      # B. Volledig Detailrapport (inclusief directe fotolinks)
+      csv_detail = gefilterde_items.to_csv(index=False).encode("utf-8")
+      with down_col2:
+        st.download_button(
+            label="📋 Download Detailrapport (Alle controlepunten & fotolinks)",
+            data=csv_detail,
+            file_name=f"audit_details_{van_datum}_tot_{tot_datum}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+      # --- 4. VISUEEL RITTENOVERZICHT ---
+      st.write("---")
+      st.subheader(
+          f"Rittenoverzicht ({totaal_aantal} audits in geselecteerde periode)"
+      )
+
+      for _, rit in gefilterde_ritten.iterrows():
+        items = gefilterde_items[
+            gefilterde_items["audit_id"] == rit["audit_id"]
+        ]
+        rit_heeft_nok = "NOK" in items["status"].values
+
+        # Kleur en statusbadge in de titel van de rit
+        status_icoon = "🔴" if rit_heeft_nok else "🟢"
+        oordeel_label = "⚠️ AFWIJKING" if rit_heeft_nok else "100% OK"
+        titel = f"{status_icoon} Audit #{rit['audit_id']} [{oordeel_label}] | {rit['truck']} ({rit['klant']}) - {rit['actie']} om {rit['timestamp']}"
+
+        with st.expander(titel):
+          st.write(f"**Inspecteur:** {rit['auditor']}")
+
+          for _, it in items.iterrows():
+            kleur = "🟢" if it["status"] == "OK" else "🔴"
+            st.markdown(
+                f"**{kleur} {it['vraag']}** — Status: **{it['status']}**"
             )
-          st.write("---")
+            if pd.notna(it["commentaar"]) and it["commentaar"]:
+              st.write(f"💬 Opmerking: *{it['commentaar']}*")
+
+            if pd.notna(it["foto_url"]) and it["foto_url"]:
+              st.image(
+                  it["foto_url"],
+                  caption=f"Foto inspectiepunt",
+                  width=350,
+              )
+            st.write("---")
 
 # ==========================================
 # ONDERDEEL 3: BEHEER & INSTELLINGEN (ADMIN)
