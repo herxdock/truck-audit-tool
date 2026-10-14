@@ -18,7 +18,33 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* 1. Algemene grote touchknoppen */
+    /* ==========================================
+       1. DUIDELIJKE AFBAKENING PER VRAAG (CARDS)
+       ========================================== */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border: 3px solid #334155 !important;          /* Duidelijke donkere kaderlijn */
+        border-left: 14px solid #0d6efd !important;    /* Dikke blauwe balk links */
+        border-radius: 20px !important;
+        background-color: #ffffff !important;
+        padding: 24px 20px !important;
+        margin-bottom: 35px !important;                /* Ruimte tussen de blokken */
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important; /* Duidelijke schaduw */
+    }
+
+    /* Vraag titel met scheidingslijn eronder */
+    .vraag-titel {
+        font-size: 30px !important;
+        font-weight: 900 !important;
+        color: #0f172a !important;
+        margin-bottom: 16px !important;
+        line-height: 1.25 !important;
+        padding-bottom: 12px !important;
+        border-bottom: 2px dashed #cbd5e1 !important;  /* Stippellijn onder vraag */
+    }
+
+    /* ==========================================
+       2. GROTE TOUCHKNOPPEN
+       ========================================== */
     div.stButton > button, 
     div[data-testid="stButton"] > button {
         min-height: 90px !important;
@@ -58,8 +84,10 @@ st.markdown(
         color: #212529 !important;
     }
 
-    /* 2. SPECIFIEK VOOR OK & NOK KNOPPEN */
-    /* OK Knop als hij actief is: KNALGROEN */
+    /* ==========================================
+       3. OK & NOK KNOPPEN
+       ========================================== */
+    /* OK Knop: KNALGROEN */
     div[class*="st-key-btn_ok_"] button[kind="primary"] {
         background-color: #198754 !important;
         border: 4px solid #0f5132 !important;
@@ -68,7 +96,7 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* NOK Knop als hij actief is: KNALROOD */
+    /* NOK Knop: KNALROOD */
     div[class*="st-key-btn_nok_"] button[kind="primary"] {
         background-color: #dc3545 !important;
         border: 4px solid #842029 !important;
@@ -77,16 +105,9 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* 3. VRAAG TITEL IN HET GROOT */
-    .vraag-titel {
-        font-size: 30px !important;
-        font-weight: 900 !important;
-        color: #111827 !important;
-        margin-bottom: 14px !important;
-        line-height: 1.25 !important;
-    }
-
-    /* 4. Invoervelden voor opmerkingen */
+    /* ==========================================
+       4. INVOER & CAMERA
+       ========================================== */
     div[data-testid="stTextInput"] input {
         font-size: 22px !important;
         min-height: 60px !important;
@@ -94,7 +115,6 @@ st.markdown(
         border: 2px solid #ccc !important;
     }
 
-    /* 5. 'Take picture' knop wat compacter maar duidelijk */
     div[class*="st-key-open_cam_"] button,
     div[class*="st-key-close_cam_"] button {
         min-height: 65px !important;
@@ -107,7 +127,6 @@ st.markdown(
         color: #333 !important;
     }
 
-    /* 6. Cameraknop zelf */
     div[data-testid="stCameraInput"] button {
         min-height: 75px !important;
     }
