@@ -284,7 +284,7 @@ def genereer_pdf_rapport(
   titel = (
       "TRUCK AUDIT DOSSIER"
       if is_enkele_rit
-      else "PERIODIEK AUDIT- & KWALITEITSRAPPORT"
+      else "SHUTTLE AUDIT REPORT"
   )
   pdf = AuditPDF(titel_rapport=titel)
   pdf.alias_nb_pages()
@@ -296,7 +296,7 @@ def genereer_pdf_rapport(
     pdf.set_font("helvetica", "B", 12)
     pdf.set_fill_color(241, 245, 249)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 8, "  1. MANAGEMENT SAMENVATTING", fill=True, ln=True)
+    pdf.cell(0, 8, "  1. OVERZICHT", fill=True, ln=True)
     pdf.ln(2)
 
     pdf.set_font("helvetica", "", 9)
