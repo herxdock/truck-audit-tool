@@ -626,15 +626,6 @@ if menu == "📋 Nieuwe Audit":
   st.subheader("1. Kies Actie")
   c1, c2 = st.columns(2)
   with c1:
-    is_load = st.session_state.sel_actie == "Load"
-    if st.button(
-        "📦 LOAD (Laden)",
-        use_container_width=True,
-        type="primary" if is_load else "secondary",
-    ):
-      st.session_state.sel_actie = "Load"
-      st.rerun()
-  with c2:
     is_unload = st.session_state.sel_actie == "Unload"
     if st.button(
         "🚚 UNLOAD (Lossen)",
@@ -642,6 +633,15 @@ if menu == "📋 Nieuwe Audit":
         type="primary" if is_unload else "secondary",
     ):
       st.session_state.sel_actie = "Unload"
+      st.rerun()
+  with c2:
+    is_load = st.session_state.sel_actie == "Load"
+    if st.button(
+        "📦 LOAD (Laden)",
+        use_container_width=True,
+        type="primary" if is_load else "secondary",
+    ):
+      st.session_state.sel_actie = "Load"
       st.rerun()
 
   # STAP 2: GROTE KLANT KNOPPEN
