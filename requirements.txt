@@ -2,3 +2,4 @@ streamlit
 pandas
 supabase
 fpdf2
+streamlit-back-camera-input
