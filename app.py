@@ -768,7 +768,7 @@ if menu == "📋 Nieuwe Audit":
             st.session_state[f"show_cam_{i}"] = True
             st.rerun()
         else:
-          foto = st.camera_input(f"📷 Richt camera voor punt {i+1}", key=f"foto_{i}")
+          foto = back_camera_input()
           if foto is not None:
             tijd_tag = get_now().strftime("%Y%m%d_%H%M%S")
             safe_truck = (
