@@ -4,11 +4,11 @@ import json
 import os
 import urllib.request
 import zipfile
+from zoneinfo import ZoneInfo
 from fpdf import FPDF
 import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
-from zoneinfo import ZoneInfo
 
 # ==========================================
 # BRUSSELSE TIJDZONE HELPER
@@ -17,8 +17,8 @@ BRUSSEL_TZ = ZoneInfo("Europe/Brussels")
 
 
 def get_now():
-  """Geeft altijd de actuele tijd in de Brusselse tijdzone (Europe/Brussels)."""
   return datetime.now(BRUSSEL_TZ)
+
 
 # Pagina instellingen
 st.set_page_config(
@@ -31,9 +31,6 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* ==========================================
-       1. ECHT DIKKE RAND ROND ELK CONTROLEBLOK
-       ========================================== */
     div[data-testid="stVerticalBlockBorderWrapper"],
     div.stVerticalBlockBorderWrapper {
         border: 6px solid #1e293b !important;
@@ -56,7 +53,6 @@ st.markdown(
         line-height: 1.3 !important;
     }
 
-    /* 2. GROTE TOUCHKNOPPEN */
     div.stButton > button, 
     div[data-testid="stButton"] > button {
         min-height: 90px !important;
@@ -95,7 +91,6 @@ st.markdown(
         color: #212529 !important;
     }
 
-    /* 3. OK & NOK KNOPPEN */
     div[class*="st-key-btn_ok_"] button[kind="primary"] {
         background-color: #198754 !important;
         border: 4px solid #0f5132 !important;
@@ -112,7 +107,6 @@ st.markdown(
         color: #ffffff !important;
     }
 
-    /* 4. INVOER & CAMERA */
     div[data-testid="stTextInput"] input {
         font-size: 22px !important;
         min-height: 60px !important;
@@ -145,14 +139,70 @@ st.markdown(
 )
 
 # ==========================================
-# SUPABASE CLIENT SETUP
+# INLOGGEN VIA STREAMLIT SECRETS (DIRECT VOORAAN)
+# ==========================================
+def verify_login(username, password):
+  user_clean = username.strip().lower()
+  pass_clean = password.strip()
+
+  if "admins" in st.secrets:
+    for admin_user, admin_pass in st.secrets["admins"].items():
+      if (
+          str(admin_user).lower() == user_clean
+          and str(admin_pass) == pass_clean
+      ):
+        return {"username": str(admin_user), "role": "admin"}
+
+  groep = st.secrets.get("auditors", st.secrets.get("inspecteurs", None))
+  if groep:
+    for audit_user, audit_pass in groep.items():
+      if (
+          str(audit_user).lower() == user_clean
+          and str(audit_pass) == pass_clean
+      ):
+        return {"username": str(audit_user), "role": "user"}
+
+  return None
+
+
+if "logged_in" not in st.session_state:
+  st.session_state.logged_in = False
+  st.session_state.user = None
+
+# ALS NIET INGELOGD: TOON DIRECT HET INLOGSCHERM ZONDER NETWERKVERTRAGING
+if not st.session_state.logged_in:
+  col_l, col_center, col_r = st.columns([1, 2, 1])
+  with col_center:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.title("🔐 Login Truck Audit")
+    with st.form("login_form"):
+      user_input = st.text_input("Gebruikersnaam")
+      pass_input = st.text_input("Wachtwoord", type="password")
+      submit = st.form_submit_button("Inloggen", use_container_width=True)
+
+      if submit:
+        user_info = verify_login(user_input, pass_input)
+        if user_info:
+          st.session_state.logged_in = True
+          st.session_state.user = user_info
+          st.rerun()
+        else:
+          st.error("Onjuiste gebruikersnaam of wachtwoord.")
+  st.stop()
+
+
+# ==========================================
+# SUPABASE CLIENT SETUP (PAS NA LOGIN)
 # ==========================================
 @st.cache_resource
 def get_supabase() -> Client:
   if "supabase" in st.secrets:
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
-    return create_client(url, key)
+    try:
+      url = st.secrets["supabase"]["url"]
+      key = st.secrets["supabase"]["key"]
+      return create_client(url, key)
+    except Exception:
+      return None
   return None
 
 
@@ -219,10 +269,40 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
+# Deze worden nu pas opgehaald NA een geldige login
 vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
+
+# ==========================================
+# HOOFDMENU & RECHTEN
+# ==========================================
+huidige_gebruiker = st.session_state.user["username"]
+is_admin = st.session_state.user["role"] == "admin"
+
+st.sidebar.markdown(f"### 👤 Ingelogd: `{huidige_gebruiker}`")
+st.sidebar.caption(f"Rol: {'Beheerder' if is_admin else 'Auditor'}")
+
+if st.sidebar.button("🚪 Uitloggen", use_container_width=True):
+  st.session_state.logged_in = False
+  st.session_state.user = None
+  st.rerun()
+
+st.sidebar.write("---")
+
+if is_admin:
+  menu = st.sidebar.radio(
+      "Navigatie",
+      [
+          "📋 Nieuwe Audit",
+          "📊 Historie & Foto's",
+          "⚙️ Beheer & Instellingen",
+      ],
+  )
+else:
+  st.sidebar.info("📋 Modus: Audit Uitvoeren")
+  menu = "📋 Nieuwe Audit"
 
 
 # ==========================================
@@ -235,7 +315,6 @@ class AuditPDF(FPDF):
     self.titel_rapport = titel_rapport
 
   def header(self):
-    # 1. Logo links plaatsen
     heeft_logo = False
     if os.path.exists("logo.png"):
       try:
@@ -244,16 +323,13 @@ class AuditPDF(FPDF):
       except Exception:
         heeft_logo = False
 
-    # Startpositie voor de titel: naast het logo (x=44) of vanaf de kantlijn (x=10)
     x_tekst = 44 if heeft_logo else 10
     self.set_xy(x_tekst, 11)
 
-    # 2. Titel links naast het logo
     self.set_font("helvetica", "B", 12)
     self.set_text_color(30, 41, 59)
     self.cell(95, 7, self.titel_rapport, border=False, align="L")
 
-    # 3. DATUM EN TIJD HELEMAAL RECHTS OP DEZELFDE HOOGTE
     self.set_font("helvetica", "", 9)
     self.set_text_color(100, 116, 139)
     self.cell(
@@ -264,7 +340,6 @@ class AuditPDF(FPDF):
         align="R",
     )
 
-    # Scheidingslijn onder het logo en de header
     self.set_xy(10, 24)
     self.set_draw_color(203, 213, 225)
     self.line(10, 24, 200, 24)
@@ -283,10 +358,9 @@ class AuditPDF(FPDF):
 
 
 def download_afbeelding_bytes(url):
-  """Haalt betrouwbaar de afbeeldingsbytes op van Supabase."""
   try:
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=8) as resp:
+    with urllib.request.urlopen(req, timeout=6) as resp:
       return resp.read()
   except Exception:
     return None
@@ -299,23 +373,21 @@ def genereer_pdf_rapport(
     tot_datum,
     is_enkele_rit=False,
 ):
-  """Genereert een compleet multi-audit PDF rapport inclusief foto's."""
   titel = (
       "TRUCK AUDIT DOSSIER"
       if is_enkele_rit
-      else "SHUTTLE AUDIT REPORT"
+      else "PERIODIEK AUDIT- & KWALITEITSRAPPORT"
   )
   pdf = AuditPDF(titel_rapport=titel)
   pdf.alias_nb_pages()
   pdf.set_auto_page_break(auto=True, margin=15)
   pdf.add_page()
 
-  # 1. SAMENVATTING / COVER BLOK (bij meervoudig rapport)
   if not is_enkele_rit:
     pdf.set_font("helvetica", "B", 12)
     pdf.set_fill_color(241, 245, 249)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 8, "  1. OVERZICHT", fill=True, ln=True)
+    pdf.cell(0, 8, "  1. MANAGEMENT SAMENVATTING", fill=True, ln=True)
     pdf.ln(2)
 
     pdf.set_font("helvetica", "", 9)
@@ -361,7 +433,6 @@ def genereer_pdf_rapport(
 
     pdf.ln(5)
 
-    # Tabel met overzicht van alle ritten
     pdf.set_font("helvetica", "B", 8)
     pdf.set_fill_color(30, 41, 59)
     pdf.set_text_color(255, 255, 255)
@@ -408,23 +479,20 @@ def genereer_pdf_rapport(
     pdf.cell(0, 8, "  2. GEDETAILLEERDE AUDIT DOSSIERS", fill=True, ln=True)
     pdf.ln(4)
 
-  # 2. DETAILPAGINA'S PER RIT (INCLUSIEF FOTO'S)
   for idx, rit in gefilterde_ritten.iterrows():
     sub_items = gefilterde_items[
         gefilterde_items["audit_id"] == rit["audit_id"]
     ]
     heeft_nok = "NOK" in sub_items["status"].values
 
-    # Als de pagina vol raakt, forceer een nette nieuwe pagina
     if pdf.get_y() > 210:
       pdf.add_page()
 
-    # Rit Header Card
     if heeft_nok:
-      pdf.set_fill_color(220, 53, 69)  # Rood bij NOK
+      pdf.set_fill_color(220, 53, 69)
       status_text = "AFWIJKING VASTGESTELD (NOK)"
     else:
-      pdf.set_fill_color(25, 135, 84)  # Groen bij OK
+      pdf.set_fill_color(25, 135, 84)
       status_text = "GOEDGEKEURD (100% OK)"
 
     pdf.set_font("helvetica", "B", 10)
@@ -451,7 +519,6 @@ def genereer_pdf_rapport(
     )
     pdf.ln(2)
 
-    # Controlepunten tabel
     pdf.set_font("helvetica", "B", 8)
     pdf.set_text_color(71, 85, 105)
     pdf.cell(100, 5, "Controlepunt", border="B")
@@ -478,7 +545,6 @@ def genereer_pdf_rapport(
     pdf.set_text_color(15, 23, 42)
     pdf.ln(2)
 
-    # FOTO'S INVOEGEN
     fotos_in_rit = sub_items[
         sub_items["foto_url"].notna() & (sub_items["foto_url"] != "")
     ]
@@ -493,7 +559,6 @@ def genereer_pdf_rapport(
       foto_h = 32
 
       for f_idx, (_, f_row) in enumerate(fotos_in_rit.iterrows()):
-        # Controleer of foto's nog op de pagina passen
         if pdf.get_y() + foto_h > 275:
           pdf.add_page()
           y_start = pdf.get_y()
@@ -511,7 +576,6 @@ def genereer_pdf_rapport(
                 w=foto_w,
                 h=foto_h,
             )
-            # Klein onderschrift onder de foto
             pdf.set_xy(x_pos, y_start + foto_h + 1)
             pdf.set_font("helvetica", "", 6)
             pdf.cell(
@@ -531,86 +595,6 @@ def genereer_pdf_rapport(
 
 
 # ==========================================
-# INLOGGEN VIA STREAMLIT SECRETS
-# ==========================================
-def verify_login(username, password):
-  user_clean = username.strip().lower()
-  pass_clean = password.strip()
-
-  if "admins" in st.secrets:
-    for admin_user, admin_pass in st.secrets["admins"].items():
-      if (
-          str(admin_user).lower() == user_clean
-          and str(admin_pass) == pass_clean
-      ):
-        return {"username": str(admin_user), "role": "admin"}
-
-  groep = st.secrets.get("auditors", st.secrets.get("inspecteurs", None))
-  if groep:
-    for audit_user, audit_pass in groep.items():
-      if (
-          str(audit_user).lower() == user_clean
-          and str(audit_pass) == pass_clean
-      ):
-        return {"username": str(audit_user), "role": "user"}
-
-  return None
-
-
-if "logged_in" not in st.session_state:
-  st.session_state.logged_in = False
-  st.session_state.user = None
-
-if not st.session_state.logged_in:
-  col_l, col_center, col_r = st.columns([1, 2, 1])
-  with col_center:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.title("🔐 Login Truck Audit")
-    with st.form("login_form"):
-      user_input = st.text_input("Gebruikersnaam")
-      pass_input = st.text_input("Wachtwoord", type="password")
-      submit = st.form_submit_button("Inloggen", use_container_width=True)
-
-      if submit:
-        user_info = verify_login(user_input, pass_input)
-        if user_info:
-          st.session_state.logged_in = True
-          st.session_state.user = user_info
-          st.rerun()
-        else:
-          st.error("Onjuiste gebruikersnaam of wachtwoord.")
-  st.stop()
-
-# ==========================================
-# HOOFDMENU & RECHTEN
-# ==========================================
-huidige_gebruiker = st.session_state.user["username"]
-is_admin = st.session_state.user["role"] == "admin"
-
-st.sidebar.markdown(f"### 👤 Ingelogd: `{huidige_gebruiker}`")
-st.sidebar.caption(f"Rol: {'Beheerder' if is_admin else 'Auditor'}")
-
-if st.sidebar.button("🚪 Uitloggen", use_container_width=True):
-  st.session_state.logged_in = False
-  st.session_state.user = None
-  st.rerun()
-
-st.sidebar.write("---")
-
-if is_admin:
-  menu = st.sidebar.radio(
-      "Navigatie",
-      [
-          "📋 Nieuwe Audit",
-          "📊 Historie & Foto's",
-          "⚙️ Beheer & Instellingen",
-      ],
-  )
-else:
-  st.sidebar.info("📋 Modus: Audit Uitvoeren")
-  menu = "📋 Nieuwe Audit"
-
-# ==========================================
 # ONDERDEEL 1: NIEUWE AUDIT (GROTE KNOPPEN)
 # ==========================================
 if menu == "📋 Nieuwe Audit":
@@ -626,8 +610,8 @@ if menu == "📋 Nieuwe Audit":
   col_head1, col_head2 = st.columns([3, 1])
   with col_head1:
     st.caption(
-        f"Inspecteur: **{huidige_gebruiker}** | {get_now().strftime('%d-%m-%Y %H:%M')}"
-        f" {datetime.now().strftime('%d-%m-%Y %H:%M')}"
+        f"Inspecteur: **{huidige_gebruiker}** |"
+        f" {get_now().strftime('%d-%m-%Y %H:%M')}"
     )
   with col_head2:
     if st.session_state.sel_actie is not None:
@@ -839,7 +823,6 @@ if menu == "📋 Nieuwe Audit":
             " instellingen."
         )
       else:
-        # 1. Upload alle gemaakte foto's naar de Supabase Bucket
         foto_urls = {}
         for item in antwoorden:
           fn = item.get("foto_pad")
@@ -856,7 +839,6 @@ if menu == "📋 Nieuwe Audit":
             except Exception as e:
               st.warning(f"Foto upload waarschuwing: {e}")
 
-        # 2. Sla de audit hoofdregel op in de tabel 'audits'
         try:
           client.table("audits").insert({
               "id": audit_id,
@@ -867,7 +849,6 @@ if menu == "📋 Nieuwe Audit":
               "auditor": huidige_gebruiker,
           }).execute()
 
-          # 3. Sla alle controlepunten op in de tabel 'audit_items'
           items_to_insert = []
           for item in antwoorden:
             fn = item["foto_pad"]
@@ -884,7 +865,6 @@ if menu == "📋 Nieuwe Audit":
         except Exception as e:
           st.error(f"Fout bij opslaan in database: {e}")
 
-      # Reset selecties
       st.session_state.sel_actie = None
       st.session_state.sel_klant = None
       st.session_state.sel_truck = None
@@ -953,7 +933,7 @@ elif menu == "📊 Historie & Foto's" and is_admin:
     try:
       ritten_df["datum"] = pd.to_datetime(ritten_df["timestamp"]).dt.date
     except Exception:
-      ritten_df["datum"] = datetime.now().date()
+      ritten_df["datum"] = get_now().date()
 
     # --- 1. FILTERPANEEL ---
     st.subheader("🔍 Filters & Periode Selectie")
@@ -1138,7 +1118,6 @@ elif menu == "📊 Historie & Foto's" and is_admin:
           with col_exp1:
             st.write(f"**Inspecteur:** {rit['auditor']}")
           with col_exp2:
-            # Knop om alléén deze losse rit als PDF te downloaden
             enkele_rit_df = gefilterde_ritten[
                 gefilterde_ritten["audit_id"] == rit["audit_id"]
             ]
