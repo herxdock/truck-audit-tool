@@ -1,3 +1,4 @@
+from streamlit_back_camera_input import back_camera_input
 from datetime import datetime
 import io
 import json
