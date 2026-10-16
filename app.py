@@ -234,7 +234,7 @@ def set_setting(key, value):
 
 
 # ==========================================
-# VERWIJDER-FUNCTIE (audit + items + foto's + log)
+# VERWIJDER-FUNCTIE
 # ==========================================
 def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
   """Verwijdert een audit + items + bijhorende storage-bestanden."""
@@ -291,7 +291,7 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
       try:
         client.storage.from_("audit-fotos").remove(foto_paden)
       except Exception as e_storage:
-        st.warning(f"⚠️ Storage cleanup deels gefaald: {e_storage}")
+        st.warning(f"Storage cleanup deels gefaald: {e_storage}")
 
     client.table("audit_items").delete().eq("audit_id", audit_id).execute()
     client.table("audits").delete().eq("id", audit_id).execute()
@@ -309,9 +309,7 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
           "opmerking": opmerking or "",
       }).execute()
     except Exception as e_log:
-      st.warning(
-          f"⚠️ Log wegschrijven faalde (audit is wel verwijderd): {e_log}"
-      )
+      st.warning(f"Log wegschrijven faalde: {e_log}")
 
     return True, f"Audit #{audit_id} definitief verwijderd.", stats
 
@@ -879,4 +877,653 @@ if menu == "📋 Nieuwe Audit":
             st.success("✅ Foto succesvol vastgelegd!")
 
           if st.button(
-              "✖
+              "✖️ Camera sluiten",
+              key=f"close_cam_{i}",
+              use_container_width=True,
+          ):
+            st.session_state[f"show_cam_{i}"] = False
+            st.rerun()
+
+        if foto_bestandsnaam:
+          st.caption(f"📁 Op
+
+                    st.caption(f"📁 Opgeslagen fotobestand: `{foto_bestandsnaam}`")
+
+        antwoorden.append({
+            "vraag": vraag,
+            "status": huidige_status,
+            "commentaar": comment,
+            "foto_pad": foto_bestandsnaam,
+            "foto_bytes": st.session_state.get(f"saved_bytes_{i}", None),
+        })
+
+    # OPSLAAN KNOP
+    st.write("<br>", unsafe_allow_html=True)
+    if st.button(
+        "💾 AUDIT VOLTOOIEN EN OPSLAAN",
+        type="primary",
+        use_container_width=True,
+    ):
+      now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
+      audit_id = int(get_now().strftime("%y%m%d%H%M%S"))
+      client = get_supabase()
+
+      if not client:
+        st.error(
+            "Supabase verbinding niet gevonden. Controleer je secrets"
+            " instellingen."
+        )
+      else:
+        foto_urls = {}
+        for item in antwoorden:
+          fn = item.get("foto_pad")
+          fb = item.get("foto_bytes")
+          if fn and fb:
+            try:
+              client.storage.from_("audit-fotos").upload(
+                  path=fn,
+                  file=fb,
+                  file_options={"content-type": "image/png", "upsert": "true"},
+              )
+              url = client.storage.from_("audit-fotos").get_public_url(fn)
+              foto_urls[fn] = url
+            except Exception as e:
+              st.warning(f"Foto upload waarschuwing: {e}")
+
+        try:
+          client.table("audits").insert({
+              "id": audit_id,
+              "timestamp": now_str,
+              "actie": st.session_state.sel_actie,
+              "klant": st.session_state.sel_klant,
+              "truck": st.session_state.sel_truck,
+              "auditor": huidige_gebruiker,
+          }).execute()
+
+          items_to_insert = []
+          for item in antwoorden:
+            fn = item["foto_pad"]
+            items_to_insert.append({
+                "audit_id": audit_id,
+                "vraag": item["vraag"],
+                "status": item["status"],
+                "commentaar": item["commentaar"],
+                "foto_url": foto_urls.get(fn, ""),
+            })
+
+          client.table("audit_items").insert(items_to_insert).execute()
+          st.success(f"✅ Audit #{audit_id} succesvol permanent opgeslagen!")
+        except Exception as e:
+          st.error(f"Fout bij opslaan in database: {e}")
+
+      st.session_state.sel_actie = None
+      st.session_state.sel_klant = None
+      st.session_state.sel_truck = None
+      for i in range(len(actieve_vragen)):
+        st.session_state.pop(f"status_{i}", None)
+        st.session_state.pop(f"comm_{i}", None)
+        st.session_state.pop(f"show_cam_{i}", None)
+        st.session_state.pop(f"saved_foto_{i}", None)
+        st.session_state.pop(f"saved_bytes_{i}", None)
+        st.session_state.pop(f"foto_{i}", None)
+      st.rerun()
+
+# ==========================================
+# ONDERDEEL 2: HISTORIE, KPI'S & RAPPORTAGE
+# ==========================================
+elif menu == "📊 Historie & Foto's" and is_admin:
+  st.title("📊 Kwaliteitscontrole & Rapportage")
+
+  client = get_supabase()
+  ritten_lijst = []
+  items_lijst = []
+
+  if client:
+    try:
+      res_audits = (
+          client.table("audits")
+          .select("*, audit_items(*)")
+          .order("id", desc=True)
+          .execute()
+      )
+      if res_audits.data:
+        for audit in res_audits.data:
+          ritten_lijst.append({
+              "audit_id": audit["id"],
+              "timestamp": audit["timestamp"],
+              "actie": audit["actie"],
+              "klant": audit["klant"],
+              "truck": audit["truck"],
+              "auditor": audit["auditor"],
+          })
+          for it in audit.get("audit_items", []):
+            items_lijst.append({
+                "audit_id": audit["id"],
+                "timestamp": audit["timestamp"],
+                "actie": audit["actie"],
+                "klant": audit["klant"],
+                "truck": audit["truck"],
+                "auditor": audit["auditor"],
+                "vraag": it["vraag"],
+                "status": it["status"],
+                "commentaar": it["commentaar"],
+                "foto_url": it.get("foto_url", ""),
+            })
+    except Exception as e:
+      st.error(f"Fout bij ophalen historie: {e}")
+
+  if not ritten_lijst:
+    st.info(
+        "Er zijn nog geen audits geregistreerd in de cloud. Voer eerst een"
+        " audit uit!"
+    )
+  else:
+    ritten_df = pd.DataFrame(ritten_lijst)
+    compleet_df = pd.DataFrame(items_lijst)
+
+    try:
+      ritten_df["datum"] = pd.to_datetime(ritten_df["timestamp"]).dt.date
+    except Exception:
+      ritten_df["datum"] = get_now().date()
+
+    # --- 1. FILTERPANEEL ---
+    st.subheader("🔍 Filters & Periode Selectie")
+
+    col_datum1, col_datum2 = st.columns(2)
+    min_db_datum = ritten_df["datum"].min()
+    max_db_datum = ritten_df["datum"].max()
+
+    with col_datum1:
+      van_datum = st.date_input("📅 Van datum:", value=min_db_datum)
+    with col_datum2:
+      tot_datum = st.date_input("📅 Tot en met datum:", value=max_db_datum)
+
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+      filter_actie = st.multiselect(
+          "Filter op Actie:",
+          options=sorted(ritten_df["actie"].unique().tolist()),
+          default=ritten_df["actie"].unique().tolist(),
+      )
+    with col_f2:
+      filter_klant = st.multiselect(
+          "Filter op Klant:",
+          options=sorted(ritten_df["klant"].unique().tolist()),
+          default=ritten_df["klant"].unique().tolist(),
+      )
+    with col_f3:
+      filter_truck = st.multiselect(
+          "Filter op Truck:",
+          options=sorted(ritten_df["truck"].unique().tolist()),
+          default=ritten_df["truck"].unique().tolist(),
+      )
+
+    alleen_nok = st.checkbox(
+        "⚠️ Toon alleen audits met afwijking / schade (minstens één NOK)",
+        value=False,
+    )
+
+    mask = (
+        (ritten_df["datum"] >= van_datum)
+        & (ritten_df["datum"] <= tot_datum)
+        & (ritten_df["actie"].isin(filter_actie))
+        & (ritten_df["klant"].isin(filter_klant))
+        & (ritten_df["truck"].isin(filter_truck))
+    )
+    gefilterde_ritten = ritten_df[mask]
+
+    if alleen_nok:
+      nok_audit_ids = compleet_df[compleet_df["status"] == "NOK"][
+          "audit_id"
+      ].unique()
+      gefilterde_ritten = gefilterde_ritten[
+          gefilterde_ritten["audit_id"].isin(nok_audit_ids)
+      ]
+
+    # --- 2. KPI METRICS ---
+    st.write("---")
+    totaal_aantal = len(gefilterde_ritten)
+
+    if totaal_aantal == 0:
+      st.warning(
+          "Geen audits gevonden voor deze specifieke filter-combinatie."
+      )
+    else:
+      gefilterde_items = compleet_df[
+          compleet_df["audit_id"].isin(gefilterde_ritten["audit_id"])
+      ]
+
+      ritten_met_nok_aantal = gefilterde_items[
+          gefilterde_items["status"] == "NOK"
+      ]["audit_id"].nunique()
+      ritten_100_ok_aantal = totaal_aantal - ritten_met_nok_aantal
+      pct_ok = round((ritten_100_ok_aantal / totaal_aantal) * 100, 1)
+      totaal_fotos = gefilterde_items[gefilterde_items["foto_url"] != ""][
+          "foto_url"
+      ].nunique()
+
+      kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+      kpi1.metric("📋 Totaal Audits", f"{totaal_aantal}")
+      kpi2.metric("🟢 100% Goedgekeurd", f"{ritten_100_ok_aantal}", f"{pct_ok}%")
+      kpi3.metric(
+          "🔴 Met Afwijking (NOK)",
+          f"{ritten_met_nok_aantal}",
+          f"-{round(100 - pct_ok, 1)}%" if ritten_met_nok_aantal > 0 else "0%",
+      )
+      kpi4.metric("📷 Gemaakte Foto's", f"{totaal_fotos}")
+
+      # --- 3. RAPPORT DOWNLOADS ---
+      st.write("---")
+      st.subheader("📥 Export & Rapportages")
+      down_col1, down_col2, down_col3 = st.columns(3)
+
+      with st.spinner("PDF rapport wordt voorbereid..."):
+        pdf_bytes = genereer_pdf_rapport(
+            gefilterde_ritten,
+            gefilterde_items,
+            van_datum,
+            tot_datum,
+            is_enkele_rit=False,
+        )
+
+      with down_col1:
+        st.download_button(
+            label="📑 Download PDF Perioderapport (Alle ritten + foto's)",
+            data=pdf_bytes,
+            file_name=f"audit_rapport_{van_datum}_tot_{tot_datum}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+        )
+
+      samenvatting_rijen = []
+      for _, rit_info in gefilterde_ritten.iterrows():
+        a_id = rit_info["audit_id"]
+        sub_items = gefilterde_items[gefilterde_items["audit_id"] == a_id]
+        aantal_ok = len(sub_items[sub_items["status"] == "OK"])
+        aantal_nok = len(sub_items[sub_items["status"] == "NOK"])
+        heeft_nok = aantal_nok > 0
+
+        opmerkingen_tekst = " | ".join([
+            f"{r['vraag']}: {r['commentaar']}"
+            for _, r in sub_items.iterrows()
+            if pd.notna(r["commentaar"]) and str(r["commentaar"]).strip() != ""
+        ])
+
+        samenvatting_rijen.append({
+            "Audit ID": a_id,
+            "Tijdstip": rit_info["timestamp"],
+            "Actie": rit_info["actie"],
+            "Klant": rit_info["klant"],
+            "Truck": rit_info["truck"],
+            "Inspecteur": rit_info["auditor"],
+            "Eindoordeel": "⚠️ AFWIJKING" if heeft_nok else "✅ 100% OK",
+            "Aantal OK": aantal_ok,
+            "Aantal NOK": aantal_nok,
+            "Opmerkingen": opmerkingen_tekst,
+        })
+
+      df_management_rapport = pd.DataFrame(samenvatting_rijen)
+      csv_management = df_management_rapport.to_csv(index=False).encode("utf-8")
+
+      with down_col2:
+        st.download_button(
+            label="📄 Download Samenvatting (CSV)",
+            data=csv_management,
+            file_name=f"audit_samenvatting_{van_datum}_tot_{tot_datum}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+      csv_detail = gefilterde_items.to_csv(index=False).encode("utf-8")
+      with down_col3:
+        st.download_button(
+            label="📋 Download Details (CSV + Fotolinks)",
+            data=csv_detail,
+            file_name=f"audit_details_{van_datum}_tot_{tot_datum}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+      # --- 4. VISUEEL RITTENOVERZICHT ---
+      st.write("---")
+      st.subheader(
+          f"Rittenoverzicht ({totaal_aantal} audits in geselecteerde periode)"
+      )
+
+      for _, rit in gefilterde_ritten.iterrows():
+        items = gefilterde_items[
+            gefilterde_items["audit_id"] == rit["audit_id"]
+        ]
+        rit_heeft_nok = "NOK" in items["status"].values
+
+        status_icoon = "🔴" if rit_heeft_nok else "🟢"
+        oordeel_label = "⚠️ AFWIJKING" if rit_heeft_nok else "100% OK"
+        titel = f"{status_icoon} Audit #{rit['audit_id']} [{oordeel_label}] | {rit['truck']} ({rit['klant']}) - {rit['actie']} om {rit['timestamp']}"
+
+        with st.expander(titel):
+          # --- VERWIJDERBLOK ---
+          del_key = f"del_open_{rit['audit_id']}"
+          if del_key not in st.session_state:
+            st.session_state[del_key] = False
+
+          col_del1, col_del2 = st.columns([1, 4])
+          with col_del1:
+            if st.button(
+                "🗑️ Verwijder",
+                key=f"btn_del_open_{rit['audit_id']}",
+                use_container_width=True,
+            ):
+              st.session_state[del_key] = not st.session_state[del_key]
+              st.rerun()
+
+          if st.session_state[del_key]:
+            st.error(
+                f"⚠️ Je staat op het punt audit #{rit['audit_id']} "
+                "definitief te verwijderen, inclusief foto's."
+            )
+            bevestig_inline = st.text_input(
+                "Typ VERWIJDER om te bevestigen:",
+                key=f"conf_del_{rit['audit_id']}",
+            )
+            if st.button(
+                "🗑️ Definitief verwijderen",
+                type="primary",
+                key=f"confirm_del_{rit['audit_id']}",
+                disabled=bevestig_inline.strip() != "VERWIJDER",
+                use_container_width=True,
+            ):
+              ok, msg, _stats = verwijder_audit_volledig(
+                  rit["audit_id"], huidige_gebruiker, "Via historiek-paneel"
+              )
+              if ok:
+                st.success(msg)
+                st.session_state[del_key] = False
+                st.rerun()
+              else:
+                st.error(msg)
+            st.write("---")
+
+          col_exp1, col_exp2 = st.columns([3, 1])
+          with col_exp1:
+            st.write(f"**Inspecteur:** {rit['auditor']}")
+          with col_exp2:
+            enkele_rit_df = gefilterde_ritten[
+                gefilterde_ritten["audit_id"] == rit["audit_id"]
+            ]
+            enkele_items_df = gefilterde_items[
+                gefilterde_items["audit_id"] == rit["audit_id"]
+            ]
+            pdf_enkel = genereer_pdf_rapport(
+                enkele_rit_df,
+                enkele_items_df,
+                van_datum,
+                tot_datum,
+                is_enkele_rit=True,
+            )
+            st.download_button(
+                label="📥 Download PDF van deze rit",
+                data=pdf_enkel,
+                file_name=f"Audit_Dossier_{rit['audit_id']}_{rit['truck']}.pdf",
+                mime="application/pdf",
+                key=f"dl_pdf_{rit['audit_id']}",
+                use_container_width=True,
+            )
+
+          for _, it in items.iterrows():
+            kleur = "🟢" if it["status"] == "OK" else "🔴"
+            st.markdown(
+                f"**{kleur} {it['vraag']}** — Status: **{it['status']}**"
+            )
+            if pd.notna(it["commentaar"]) and it["commentaar"]:
+              st.write(f"💬 Opmerking: *{it['commentaar']}*")
+
+            if pd.notna(it["foto_url"]) and it["foto_url"]:
+              st.image(
+                  it["foto_url"],
+                  caption="Foto inspectiepunt",
+                  width=350,
+              )
+            st.write("---")
+
+# ==========================================
+# ONDERDEEL 3: BEHEER & INSTELLINGEN (ADMIN)
+# ==========================================
+elif menu == "⚙️ Beheer & Instellingen" and is_admin:
+  st.title("⚙️ Beheerpaneel")
+  st.caption("Beheer trucks, klanten, koppelingen en controlepunten.")
+
+  tab1, tab2, tab3, tab4, tab5 = st.tabs([
+      "🔗 Klanten & Trucks Koppelen",
+      "🏢 Klanten",
+      "🚛 Trucks",
+      "❓ Vragen per Actie",
+      "🗑️ Audits Verwijderen",
+  ])
+
+  with tab1:
+    st.subheader("Koppel vrachtwagens aan een klant")
+    gekozen_klant = st.selectbox("Kies Klant", klanten_lijst)
+    huidige_gekoppelde = klant_trucks_map.get(gekozen_klant, [])
+
+    geselecteerde_trucks = st.multiselect(
+        f"Beschikbare trucks voor '{gekozen_klant}':",
+        options=trucks_lijst,
+        default=[t for t in huidige_gekoppelde if t in trucks_lijst],
+    )
+
+    if st.button("💾 Koppeling Opslaan", type="primary"):
+      klant_trucks_map[gekozen_klant] = geselecteerde_trucks
+      set_setting("klant_trucks", klant_trucks_map)
+      st.success(
+          f"Opgeslagen! {len(geselecteerde_trucks)} trucks gekoppeld aan"
+          f" {gekozen_klant}."
+      )
+      st.rerun()
+
+  with tab2:
+    nieuwe_klant = st.text_input("Nieuwe klant toevoegen")
+    if st.button("Voeg klant toe"):
+      if nieuwe_klant and nieuwe_klant not in klanten_lijst:
+        klanten_lijst.append(nieuwe_klant)
+        set_setting("klanten", klanten_lijst)
+        st.rerun()
+
+    del_klant = st.selectbox("Verwijder een klant", ["---"] + klanten_lijst)
+    if st.button("Verwijder klant"):
+      if del_klant != "---":
+        klanten_lijst.remove(del_klant)
+        set_setting("klanten", klanten_lijst)
+        if del_klant in klant_trucks_map:
+          del klant_trucks_map[del_klant]
+          set_setting("klant_trucks", klant_trucks_map)
+        st.rerun()
+    st.write("Actieve klanten:", klanten_lijst)
+
+  with tab3:
+    nieuwe_truck = st.text_input("Nieuwe vrachtwagen toevoegen")
+    if st.button("Voeg truck toe"):
+      if nieuwe_truck and nieuwe_truck not in trucks_lijst:
+        trucks_lijst.append(nieuwe_truck)
+        set_setting("trucks", trucks_lijst)
+        st.rerun()
+
+    del_truck = st.selectbox("Verwijder een truck", ["---"] + trucks_lijst)
+    if st.button("Verwijder truck"):
+      if del_truck != "---":
+        trucks_lijst.remove(del_truck)
+        set_setting("trucks", trucks_lijst)
+        st.rerun()
+    st.write("Actieve trucks:", trucks_lijst)
+
+  with tab4:
+    st.subheader("Controlepunten beheren per Actie")
+    actie_keuze = st.radio(
+        "Kies welke vragenset je wilt aanpassen:",
+        ["Load", "Unload"],
+        horizontal=True,
+    )
+
+    vragen_deze_actie = vragen_per_actie.get(actie_keuze, [])
+
+    nieuwe_vraag = st.text_input(f"Nieuw controlepunt toevoegen voor {actie_keuze}")
+    if st.button(f"Voeg vraag toe aan {actie_keuze}"):
+      if nieuwe_vraag and nieuwe_vraag not in vragen_deze_actie:
+        vragen_deze_actie.append(nieuwe_vraag)
+        vragen_per_actie[actie_keuze] = vragen_deze_actie
+        set_setting("vragen_per_actie", vragen_per_actie)
+        st.rerun()
+
+    del_vraag = st.selectbox(
+        f"Verwijder een vraag uit {actie_keuze}", ["---"] + vragen_deze_actie
+    )
+    if st.button(f"Verwijder vraag uit {actie_keuze}"):
+      if del_vraag != "---":
+        vragen_deze_actie.remove(del_vraag)
+        vragen_per_actie[actie_keuze] = vragen_deze_actie
+        set_setting("vragen_per_actie", vragen_per_actie)
+        st.rerun()
+
+    st.write(f"**Actieve controlepunten voor {actie_keuze}:**")
+    for idx, v in enumerate(vragen_deze_actie):
+      st.write(f"- {v}")
+
+  with tab5:
+    st.subheader("🗑️ Audits definitief verwijderen")
+    st.warning(
+        "⚠️ Deze actie is onomkeerbaar. De audit, alle controlepunten "
+        "én foto's worden verwijderd uit Supabase."
+    )
+
+    client_admin = get_supabase()
+    if not client_admin:
+      st.error("Geen Supabase verbinding.")
+    else:
+      try:
+        alle_audits = (
+            client_admin.table("audits")
+            .select("id, timestamp, klant, truck, actie, auditor, audit_items(id)")
+            .order("id", desc=True)
+            .limit(500)
+            .execute()
+        ).data or []
+      except Exception as e:
+        alle_audits = []
+        st.error(f"Fout bij ophalen audits: {e}")
+
+      if not alle_audits:
+        st.info("Er zijn geen audits om te verwijderen.")
+      else:
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+          filter_klant_del = st.multiselect(
+              "Filter op klant (optioneel):",
+              options=sorted({a.get("klant", "") for a in alle_audits}),
+          )
+        with col_v2:
+          filter_truck_del = st.multiselect(
+              "Filter op truck (optioneel):",
+              options=sorted({a.get("truck", "") for a in alle_audits}),
+          )
+
+        gefilterd = [
+            a for a in alle_audits
+            if (not filter_klant_del or a.get("klant") in filter_klant_del)
+            and (not filter_truck_del or a.get("truck") in filter_truck_del)
+        ]
+
+        opties = {
+            f"#{a['id']} | {a['timestamp'][:16]} | {a.get('truck','?')} "
+            f"({a.get('klant','?')}) - {a.get('actie','?')} "
+            f"[{len(a.get('audit_items') or [])} items]": a["id"]
+            for a in gefilterd
+        }
+
+        geselecteerde_labels = st.multiselect(
+            f"Selecteer audits om te verwijderen ({len(opties)} beschikbaar):",
+            options=list(opties.keys()),
+        )
+        geselecteerde_ids = [opties[lbl] for lbl in geselecteerde_labels]
+
+        if geselecteerde_ids:
+          st.error(
+              f"⚠️ Je staat op het punt {len(geselecteerde_ids)} audit(s) te "
+              "verwijderen. Dit kan niet ongedaan gemaakt worden."
+          )
+
+          bevestiging_tekst = st.text_input(
+              "Typ exact VERWIJDER om te bevestigen:",
+              placeholder="VERWIJDER",
+          )
+          opmerking_del = st.text_input(
+              "Reden / opmerking (optioneel, wordt gelogd):",
+              placeholder="bv. dubbel geregistreerd, testdata...",
+          )
+          bevestig_check = st.checkbox(
+              "Ik begrijp dat deze actie onomkeerbaar is."
+          )
+
+          knop_actief = (
+              bevestiging_tekst.strip() == "VERWIJDER"
+              and bevestig_check
+          )
+
+          if st.button(
+              f"🗑️ Verwijder {len(geselecteerde_ids)} audit(s) definitief",
+              type="primary",
+              disabled=not knop_actief,
+              use_container_width=True,
+          ):
+            succes, fouten = 0, []
+            voortgang = st.progress(0.0, text="Verwijderen...")
+            for i, aid in enumerate(geselecteerde_ids):
+              ok, msg, _stats = verwijder_audit_volledig(
+                  aid, huidige_gebruiker, opmerking_del
+              )
+              if ok:
+                succes += 1
+              else:
+                fouten.append(f"#{aid}: {msg}")
+              voortgang.progress(
+                  (i + 1) / len(geselecteerde_ids),
+                  text=f"Verwerkt: {i+1}/{len(geselecteerde_ids)}",
+              )
+            voortgang.empty()
+
+            if succes:
+              st.success(f"✅ {succes} audit(s) succesvol verwijderd.")
+            if fouten:
+              st.error("Fouten:\n- " + "\n- ".join(fouten))
+            st.rerun()
+
+        st.write("---")
+        st.subheader("📜 Recente verwijderingen (laatste 20)")
+        try:
+          log_res = (
+              client_admin.table("deletion_log")
+              .select("*")
+              .order("deleted_at", desc=True)
+              .limit(20)
+              .execute()
+          )
+          if log_res.data:
+            st.dataframe(
+                pd.DataFrame(log_res.data)[
+                    [
+                        "deleted_at",
+                        "audit_id",
+                        "klant",
+                        "truck",
+                        "uitgevoerd_door",
+                        "aantal_items",
+                        "aantal_fotos",
+                        "opmerking",
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+          else:
+            st.caption("Nog geen verwijderingen gelogd.")
+        except Exception as e:
+          st.caption(f"Log kon niet geladen worden: {e}")
