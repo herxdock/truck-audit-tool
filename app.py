@@ -885,9 +885,7 @@ if menu == "📋 Nieuwe Audit":
             st.rerun()
 
         if foto_bestandsnaam:
-          st.caption(f"📁 Op
-
-                    st.caption(f"📁 Opgeslagen fotobestand: `{foto_bestandsnaam}`")
+          st.caption(f"📁 Opgeslagen fotobestand: `{foto_bestandsnaam}`")
 
         antwoorden.append({
             "vraag": vraag,
