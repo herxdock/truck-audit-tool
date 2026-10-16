@@ -140,7 +140,7 @@ st.markdown(
 )
 
 # ==========================================
-# INLOGGEN VIA STREAMLIT SECRETS (DIRECT VOORAAN)
+# INLOGGEN VIA STREAMLIT SECRETS
 # ==========================================
 def verify_login(username, password):
   user_clean = username.strip().lower()
@@ -170,7 +170,6 @@ if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
   st.session_state.user = None
 
-# ALS NIET INGELOGD: TOON DIRECT HET INLOGSCHERM ZONDER NETWERKVERTRAGING
 if not st.session_state.logged_in:
   col_l, col_center, col_r = st.columns([1, 2, 1])
   with col_center:
@@ -193,7 +192,7 @@ if not st.session_state.logged_in:
 
 
 # ==========================================
-# SUPABASE CLIENT SETUP (PAS NA LOGIN)
+# SUPABASE CLIENT SETUP
 # ==========================================
 @st.cache_resource
 def get_supabase() -> Client:
@@ -238,11 +237,7 @@ def set_setting(key, value):
 # VERWIJDER-FUNCTIE (audit + items + foto's + log)
 # ==========================================
 def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
-  """
-  Verwijdert een audit + items + bijhorende storage-bestanden.
-  Logt de actie in de deletion_log tabel.
-  Retourneert (success: bool, message: str, stats: dict).
-  """
+  """Verwijdert een audit + items + bijhorende storage-bestanden."""
   client = get_supabase()
   if not client:
     return False, "Geen Supabase verbinding.", {}
@@ -257,7 +252,6 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
   }
 
   try:
-    # 1. Audit header ophalen (voor log + referentie)
     audit_res = (
         client.table("audits")
         .select("*")
@@ -273,7 +267,6 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
     stats["truck"] = audit_row.get("truck")
     stats["auditor"] = audit_row.get("auditor")
 
-    # 2. Items ophalen (om foto_paden te kennen)
     items_res = (
         client.table("audit_items")
         .select("id, foto_url")
@@ -283,7 +276,6 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
     items = items_res.data or []
     stats["aantal_items"] = len(items)
 
-    # 3. Foto-paden uit URL's halen
     foto_paden = []
     for it in items:
       url = it.get("foto_url") or ""
@@ -295,20 +287,15 @@ def verwijder_audit_volledig(audit_id, uitgevoerd_door, opmerking=""):
     stats["foto_paden"] = foto_paden
     stats["aantal_fotos"] = len(foto_paden)
 
-    # 4. Storage cleanup (best-effort, faalt niet de hele delete)
     if foto_paden:
       try:
         client.storage.from_("audit-fotos").remove(foto_paden)
       except Exception as e_storage:
         st.warning(f"⚠️ Storage cleanup deels gefaald: {e_storage}")
 
-    # 5. Items verwijderen
     client.table("audit_items").delete().eq("audit_id", audit_id).execute()
-
-    # 6. Audit verwijderen
     client.table("audits").delete().eq("id", audit_id).execute()
 
-    # 7. Loggen
     try:
       client.table("deletion_log").insert({
           "audit_id": audit_id,
@@ -368,7 +355,6 @@ standaard_klant_trucks = {
     "TS-Lux": ["Truck 01", "Truck 05", "Truck 06"],
 }
 
-# Deze worden nu pas opgehaald NA een geldige login
 vragen_per_actie = get_setting("vragen_per_actie", standaard_vragen)
 trucks_lijst = get_setting("trucks", standaard_trucks)
 klanten_lijst = get_setting("klanten", standaard_klanten)
@@ -405,7 +391,7 @@ else:
 
 
 # ==========================================
-# PDF RAPPORTAGE GENERATOR (FPDF2)
+# PDF RAPPORTAGE GENERATOR
 # ==========================================
 class AuditPDF(FPDF):
 
@@ -694,7 +680,7 @@ def genereer_pdf_rapport(
 
 
 # ==========================================
-# ONDERDEEL 1: NIEUWE AUDIT (GROTE KNOPPEN)
+# ONDERDEEL 1: NIEUWE AUDIT
 # ==========================================
 if menu == "📋 Nieuwe Audit":
   st.title("📋 Nieuwe Truck Audit")
@@ -718,7 +704,6 @@ if menu == "📋 Nieuwe Audit":
         st.session_state.sel_actie = None
         st.session_state.sel_klant = None
         st.session_state.sel_truck = None
-        # Ook alle vraag-gerelateerde state opruimen
         for k in list(st.session_state.keys()):
           if (
               k.startswith("status_")
@@ -731,7 +716,6 @@ if menu == "📋 Nieuwe Audit":
             del st.session_state[k]
         st.rerun()
 
-  # STAP 1: GROTE ACTIE KNOPPEN
   st.subheader("1. Kies Actie")
   c1, c2 = st.columns(2)
   with c1:
@@ -753,7 +737,6 @@ if menu == "📋 Nieuwe Audit":
       st.session_state.sel_actie = "Load"
       st.rerun()
 
-  # STAP 2: GROTE KLANT KNOPPEN
   if st.session_state.sel_actie:
     st.write("---")
     st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
@@ -774,7 +757,6 @@ if menu == "📋 Nieuwe Audit":
             st.session_state.sel_truck = None
             st.rerun()
 
-  # STAP 3: GEFILTERDE TRUCK KNOPPEN
   if st.session_state.sel_klant:
     st.write("---")
     st.subheader(f"3. Kies Truck ({st.session_state.sel_klant})")
@@ -806,7 +788,6 @@ if menu == "📋 Nieuwe Audit":
               st.session_state.sel_truck = truck_naam
               st.rerun()
 
-  # STAP 4: CONTROLEPUNTEN MET 6PX DIKKE KADERS
   if (
       st.session_state.sel_actie
       and st.session_state.sel_klant
@@ -863,4 +844,39 @@ if menu == "📋 Nieuwe Audit":
             placeholder="Typ hier eventuele opmerkingen of schades...",
         )
 
-        foto_b
+        foto_bestandsnaam = st.session_state.get(f"saved_foto_{i}", "")
+        camera_open = st.session_state.get(f"show_cam_{i}", False)
+
+        if not camera_open:
+          label_cam = (
+              "📸 Foto opnieuw nemen"
+              if foto_bestandsnaam
+              else "📷 Take picture (Foto toevoegen)"
+          )
+          if st.button(
+              label_cam, key=f"open_cam_{i}", use_container_width=True
+          ):
+            st.session_state[f"show_cam_{i}"] = True
+            st.rerun()
+        else:
+          foto = back_camera_input(key=f"foto_{i}")
+          if foto is not None:
+            tijd_tag = get_now().strftime("%Y%m%d_%H%M%S")
+            safe_truck = (
+                "".join(
+                    c
+                    for c in str(st.session_state.sel_truck)
+                    if c.isalnum() or c in (" ", "_", "-")
+                )
+                .strip()
+                .replace(" ", "_")
+            )
+            foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
+            foto_bytes = foto.getvalue()
+
+            st.session_state[f"saved_foto_{i}"] = foto_bestandsnaam
+            st.session_state[f"saved_bytes_{i}"] = foto_bytes
+            st.success("✅ Foto succesvol vastgelegd!")
+
+          if st.button(
+              "✖
