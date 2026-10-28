@@ -29,115 +29,120 @@ st.set_page_config(
 # ==========================================
 # HEFTRUCK & TABLET STYLING (CSS)
 # ==========================================
-st.markdown(
-    """
+st.markdown("""
 <style>
+    /* ===== PORTRAIT-FIRST BASIS ===== */
+    /* Compacte container: geen 24px padding meer */
     div[data-testid="stVerticalBlockBorderWrapper"],
     div.stVerticalBlockBorderWrapper {
-        border: 6px solid #1e293b !important;
-        border-radius: 24px !important;
+        border: 3px solid #1e293b !important;
+        border-radius: 14px !important;
         background-color: #ffffff !important;
-        padding: 24px 20px !important;
-        margin-top: 15px !important;
-        margin-bottom: 45px !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22) !important;
+        padding: 12px 10px !important;
+        margin-top: 8px !important;
+        margin-bottom: 14px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.12) !important;
     }
 
+    /* Vraag-titel: kleiner, minder padding, blijft leesbaar */
     .vraag-titel {
-        font-size: 28px !important;
-        font-weight: 900 !important;
+        font-size: 1.25rem !important;      /* ~20px */
+        font-weight: 800 !important;
         color: #ffffff !important;
         background-color: #1e293b !important;
-        padding: 14px 18px !important;
-        border-radius: 14px !important;
-        margin-bottom: 20px !important;
-        line-height: 1.3 !important;
+        padding: 10px 12px !important;
+        border-radius: 10px !important;
+        margin-bottom: 12px !important;
+        line-height: 1.25 !important;
     }
 
-    div.stButton > button, 
+    /* Knoppen: 70px hoog i.p.v. 90px, tekst 1.3rem */
+    div.stButton > button,
     div[data-testid="stButton"] > button {
-        min-height: 90px !important;
-        border-radius: 18px !important;
-        margin-bottom: 10px !important;
-        box-shadow: 0 5px 10px rgba(0,0,0,0.18) !important;
+        min-height: 70px !important;
+        border-radius: 12px !important;
+        margin-bottom: 6px !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.15) !important;
         border: 2px solid #bbb !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 10px 15px !important;
+        padding: 6px 10px !important;
     }
-
     div.stButton > button p,
-    div[data-testid="stButton"] > button p,
-    div.stButton > button div[data-testid="stMarkdownContainer"] p {
-        font-size: 32px !important;
-        font-weight: 900 !important;
-        line-height: 1.2 !important;
+    div[data-testid="stButton"] > button p {
+        font-size: 1.3rem !important;       /* ~21px */
+        font-weight: 800 !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
-        text-align: center !important;
     }
 
-    div.stButton > button[kind="primary"] {
-        background-color: #0d6efd !important;
-        border: 4px solid #084298 !important;
+    /* OK-knop: idle = lichtgroen, actief = vol groen */
+    div[class*="st-key-btn_ok_"] button[kind="secondary"] {
+        background-color: #d1fae5 !important;
+        border: 2px solid #10b981 !important;
     }
-    div.stButton > button[kind="primary"] p {
-        color: #ffffff !important;
+    div[class*="st-key-btn_ok_"] button[kind="secondary"] p {
+        color: #065f46 !important;
     }
-
-    div.stButton > button[kind="secondary"] {
-        background-color: #f1f3f5 !important;
-    }
-    div.stButton > button[kind="secondary"] p {
-        color: #212529 !important;
-    }
-
     div[class*="st-key-btn_ok_"] button[kind="primary"] {
         background-color: #198754 !important;
-        border: 4px solid #0f5132 !important;
+        border: 3px solid #0f5132 !important;
     }
     div[class*="st-key-btn_ok_"] button[kind="primary"] p {
         color: #ffffff !important;
     }
 
+    /* NOK-knop: idle = lichtrood, actief = vol rood */
+    div[class*="st-key-btn_nok_"] button[kind="secondary"] {
+        background-color: #fee2e2 !important;
+        border: 2px solid #ef4444 !important;
+    }
+    div[class*="st-key-btn_nok_"] button[kind="secondary"] p {
+        color: #991b1b !important;
+    }
     div[class*="st-key-btn_nok_"] button[kind="primary"] {
         background-color: #dc3545 !important;
-        border: 4px solid #842029 !important;
+        border: 3px solid #842029 !important;
     }
     div[class*="st-key-btn_nok_"] button[kind="primary"] p {
         color: #ffffff !important;
     }
 
+    /* Tekstveld: iets compacter */
     div[data-testid="stTextInput"] input {
-        font-size: 22px !important;
-        min-height: 60px !important;
-        border-radius: 12px !important;
+        font-size: 1.1rem !important;
+        min-height: 52px !important;
+        border-radius: 10px !important;
         border: 2px solid #ccc !important;
     }
 
-    div[class*="st-key-open_cam_"] button,
-    div[class*="st-key-close_cam_"] button {
-        min-height: 65px !important;
-        border-radius: 14px !important;
-        background-color: #e9ecef !important;
+    /* ===== STICKY FOOTER voor Vorige/Volgende/Opslaan ===== */
+    div[class*="st-key-nav_footer_"] {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: #ffffff !important;
+        border-top: 3px solid #1e293b !important;
+        padding: 8px 12px 12px 12px !important;
+        z-index: 999 !important;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.15) !important;
     }
-    div[class*="st-key-open_cam_"] button p,
-    div[class*="st-key-close_cam_"] button p {
-        font-size: 22px !important;
-        color: #333 !important;
+    /* Body krijgt onderaan ruimte zodat footer niets afdekt */
+    div[data-testid="stAppViewContainer"] > .main {
+        padding-bottom: 110px !important;
     }
 
-    div[data-testid="stCameraInput"] button {
-        min-height: 75px !important;
-    }
-    div[data-testid="stCameraInput"] button p {
-        font-size: 24px !important;
-        font-weight: 800 !important;
+    /* ===== TOPBAR: verberg sidebar volledig ===== */
+    section[data-testid="stSidebar"] { display: none !important; }
+    button[data-testid="stSidebarCollapsedControl"] { display: none !important; }
+
+    /* ===== Media query: landscape (breed scherm) ===== */
+    @media (min-width: 1000px) {
+        .vraag-titel { font-size: 1.6rem !important; padding: 14px 18px !important; }
+        div.stButton > button { min-height: 80px !important; }
+        div.stButton > button p { font-size: 1.5rem !important; }
     }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 # ==========================================
 # INLOGGEN VIA STREAMLIT SECRETS
@@ -359,33 +364,40 @@ klanten_lijst = get_setting("klanten", standaard_klanten)
 klant_trucks_map = get_setting("klant_trucks", standaard_klant_trucks)
 
 # ==========================================
-# HOOFDMENU & RECHTEN
+# HOOFDMENU & RECHTEN (TOPBAR i.p.v. sidebar)
 # ==========================================
 huidige_gebruiker = st.session_state.user["username"]
 is_admin = st.session_state.user["role"] == "admin"
 
-st.sidebar.markdown(f"### 👤 Ingelogd: `{huidige_gebruiker}`")
-st.sidebar.caption(f"Rol: {'Beheerder' if is_admin else 'Auditor'}")
+# Drie compacte kolommen bovenaan het scherm
+top_l, top_m, top_r = st.columns([2, 3, 1])
 
-if st.sidebar.button("🚪 Uitloggen", use_container_width=True):
-  st.session_state.logged_in = False
-  st.session_state.user = None
-  st.rerun()
+with top_l:
+    # Links: gebruiker + rol (compact, 1 regel)
+    rol_tekst = "Beheerder" if is_admin else "Auditor"
+    st.markdown(f"👤 **{huidige_gebruiker}**  \n<small>{rol_tekst}</small>",
+                unsafe_allow_html=True)
 
-st.sidebar.write("---")
+with top_m:
+    # Midden: navigatie (alleen voor admin, anders vaste tekst)
+    if is_admin:
+        menu = st.selectbox(
+            "Navigatie",
+            ["📋 Nieuwe Audit", "📊 Historie & Foto's", "⚙️ Beheer & Instellingen"],
+            label_visibility="collapsed",   # verbergt het "Navigatie"-label
+        )
+    else:
+        menu = "📋 Nieuwe Audit"
+        st.markdown("📋 **Modus: Audit Uitvoeren**")
 
-if is_admin:
-  menu = st.sidebar.radio(
-      "Navigatie",
-      [
-          "📋 Nieuwe Audit",
-          "📊 Historie & Foto's",
-          "⚙️ Beheer & Instellingen",
-      ],
-  )
-else:
-  st.sidebar.info("📋 Modus: Audit Uitvoeren")
-  menu = "📋 Nieuwe Audit"
+with top_r:
+    # Rechts: uitlogknop (compact, icoon-only)
+    if st.button("🚪", help="Uitloggen", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user = None
+        st.rerun()
+
+st.divider()   # dunne lijn onder de topbar
 
 
 # ==========================================
@@ -678,293 +690,232 @@ def genereer_pdf_rapport(
 
 
 # ==========================================
-# ONDERDEEL 1: NIEUWE AUDIT
+# ONDERDEEL 1: NIEUWE AUDIT (PORTRAIT WIZARD)
 # ==========================================
 if menu == "📋 Nieuwe Audit":
-  st.title("📋 Nieuwe Truck Audit")
-
-  if "sel_actie" not in st.session_state:
-    st.session_state.sel_actie = None
-  if "sel_klant" not in st.session_state:
-    st.session_state.sel_klant = None
-  if "sel_truck" not in st.session_state:
-    st.session_state.sel_truck = None
-
-  col_head1, col_head2 = st.columns([3, 1])
-  with col_head1:
-    st.caption(
-        f"Inspecteur: **{huidige_gebruiker}** |"
-        f" {get_now().strftime('%d-%m-%Y %H:%M')}"
-    )
-  with col_head2:
-    if st.session_state.sel_actie is not None:
-      if st.button("🔄 Reset Selectie", use_container_width=True):
+    # --- State initialisatie ---
+    if "wizard_step" not in st.session_state:
+        st.session_state.wizard_step = 0  # 0 = selectie, 1..N = vragen, N+1 = review
+    if "sel_actie" not in st.session_state:
         st.session_state.sel_actie = None
+    if "sel_klant" not in st.session_state:
         st.session_state.sel_klant = None
+    if "sel_truck" not in st.session_state:
         st.session_state.sel_truck = None
+
+    def reset_audit():
         for k in list(st.session_state.keys()):
-          if (
-              k.startswith("status_")
-              or k.startswith("comm_")
-              or k.startswith("show_cam_")
-              or k.startswith("saved_foto_")
-              or k.startswith("saved_bytes_")
-              or k.startswith("foto_")
-          ):
-            del st.session_state[k]
+            if (k.startswith(("status_", "comm_", "show_cam_", "saved_foto_",
+                              "saved_bytes_", "foto_"))
+                or k in ("sel_actie", "sel_klant", "sel_truck", "wizard_step")):
+                del st.session_state[k]
         st.rerun()
 
-  st.subheader("1. Kies Actie")
-  c1, c2 = st.columns(2)
-  with c1:
-    is_unload = st.session_state.sel_actie == "Unload"
-    if st.button(
-        "🚚 UNLOAD (Lossen)",
-        use_container_width=True,
-        type="primary" if is_unload else "secondary",
-    ):
-      st.session_state.sel_actie = "Unload"
-      st.rerun()
-  with c2:
-    is_load = st.session_state.sel_actie == "Load"
-    if st.button(
-        "📦 LOAD (Laden)",
-        use_container_width=True,
-        type="primary" if is_load else "secondary",
-    ):
-      st.session_state.sel_actie = "Load"
-      st.rerun()
+    # --- STAP 0: Selectie (actie → klant → truck) ---
+    if st.session_state.wizard_step == 0:
+        st.title("📋 Nieuwe Audit")
+        st.caption(f"Inspecteur: **{huidige_gebruiker}**")
 
-  if st.session_state.sel_actie:
-    st.write("---")
-    st.subheader(f"2. Kies Klant ({st.session_state.sel_actie})")
+        # 1. Actie
+        st.subheader("1. Kies actie")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🚚 UNLOAD", use_container_width=True,
+                         type="primary" if st.session_state.sel_actie == "Unload" else "secondary"):
+                st.session_state.sel_actie = "Unload"
+                st.rerun()
+        with c2:
+            if st.button("📦 LOAD", use_container_width=True,
+                         type="primary" if st.session_state.sel_actie == "Load" else "secondary"):
+                st.session_state.sel_actie = "Load"
+                st.rerun()
 
-    kolommen_per_rij = 2
-    for i in range(0, len(klanten_lijst), kolommen_per_rij):
-      cols = st.columns(kolommen_per_rij)
-      for j, klant_naam in enumerate(klanten_lijst[i : i + kolommen_per_rij]):
-        with cols[j]:
-          is_active = st.session_state.sel_klant == klant_naam
-          if st.button(
-              f"🏢 {klant_naam}",
-              key=f"btn_k_{klant_naam}",
-              use_container_width=True,
-              type="primary" if is_active else "secondary",
-          ):
-            st.session_state.sel_klant = klant_naam
-            st.session_state.sel_truck = None
-            st.rerun()
+        # 2. Klant
+        if st.session_state.sel_actie:
+            st.subheader("2. Kies klant")
+            for klant in klanten_lijst:
+                if st.button(f"🏢 {klant}", key=f"btn_k_{klant}",
+                             use_container_width=True,
+                             type="primary" if st.session_state.sel_klant == klant else "secondary"):
+                    st.session_state.sel_klant = klant
+                    st.session_state.sel_truck = None
+                    st.rerun()
 
-  if st.session_state.sel_klant:
-    st.write("---")
-    st.subheader(f"3. Kies Truck ({st.session_state.sel_klant})")
+        # 3. Truck
+        if st.session_state.sel_klant:
+            st.subheader("3. Kies truck")
+            trucks = klant_trucks_map.get(st.session_state.sel_klant, trucks_lijst)
+            for truck in trucks:
+                if st.button(f"🚛 {truck}", key=f"btn_t_{truck}",
+                             use_container_width=True,
+                             type="primary" if st.session_state.sel_truck == truck else "secondary"):
+                    st.session_state.sel_truck = truck
+                    st.rerun()
 
-    gekoppelde_trucks = klant_trucks_map.get(
-        st.session_state.sel_klant, trucks_lijst
-    )
+        # Start wizard
+        if st.session_state.sel_truck:
+            st.write("")
+            if st.button("▶️ Start audit", type="primary", use_container_width=True):
+                st.session_state.wizard_step = 1
+                st.rerun()
 
-    if not gekoppelde_trucks:
-      st.warning(
-          f"⚠️ Geen trucks gekoppeld aan '{st.session_state.sel_klant}' in het"
-          " beheerpaneel."
-      )
+    # --- STAP 1..N: Vragen (1 per scherm) ---
     else:
-      kolommen_trucks = 2
-      for i in range(0, len(gekoppelde_trucks), kolommen_trucks):
-        cols = st.columns(kolommen_trucks)
-        for j, truck_naam in enumerate(
-            gekoppelde_trucks[i : i + kolommen_trucks]
-        ):
-          with cols[j]:
-            is_active_truck = st.session_state.sel_truck == truck_naam
-            if st.button(
-                f"🚛 {truck_naam}",
-                key=f"btn_t_{truck_naam}",
-                use_container_width=True,
-                type="primary" if is_active_truck else "secondary",
-            ):
-              st.session_state.sel_truck = truck_naam
-              st.rerun()
+        actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
+        totaal = len(actieve_vragen)
+        idx = st.session_state.wizard_step - 1  # 0-based
 
-  if (
-      st.session_state.sel_actie
-      and st.session_state.sel_klant
-      and st.session_state.sel_truck
-  ):
-    st.write("---")
-    st.info(
-        f"Gekozen: **{st.session_state.sel_actie}** |"
-        f" **{st.session_state.sel_klant}** | **{st.session_state.sel_truck}**"
-    )
-    st.subheader(f"4. Controlepunten voor {st.session_state.sel_actie}")
+        if idx >= totaal:
+            # --- REVIEW / OPSLAAN ---
+            st.title("✅ Overzicht & opslaan")
+            for i, v in enumerate(actieve_vragen):
+                status = st.session_state.get(f"status_{i}", "—")
+                comm = st.session_state.get(f"comm_{i}", "")
+                foto = st.session_state.get(f"saved_foto_{i}", "")
+                icoon = "🟢" if status == "OK" else ("🔴" if status == "NOK" else "⚪")
+                with st.container(border=True):
+                    st.markdown(f"**{icoon} {v}**")
+                    st.caption(f"Status: **{status}**" + (f" · 💬 {comm}" if comm else "") +
+                               (f" · 📷 {foto}" if foto else ""))
 
-    actieve_vragen = vragen_per_actie.get(st.session_state.sel_actie, [])
+            onbeantwoord = sum(1 for i in range(totaal)
+                               if i not in st.session_state.get("_answered", set()))
+            # Simpele check: status aanwezig?
+            onbeantwoord = sum(1 for i in range(totaal)
+                               if f"status_{i}" not in st.session_state)
+            if onbeantwoord:
+                st.warning(f"⚠️ {onbeantwoord} vraag/vragen nog niet beantwoord.")
 
-    if not actieve_vragen:
-      st.warning(
-          f"Geen controlepunten geconfigureerd voor '{st.session_state.sel_actie}'."
-      )
-
-    antwoorden = []
-    for i, vraag in enumerate(actieve_vragen):
-      with st.container(border=True):
-        st.markdown(
-            f"<div class='vraag-titel'>{vraag}</div>", unsafe_allow_html=True
-        )
-
-        huidige_status = st.session_state.get(f"status_{i}", "OK")
-
-        c_ok, c_nok = st.columns(2)
-        with c_ok:
-          is_ok = huidige_status == "OK"
-          if st.button(
-              "🟢 OK",
-              key=f"btn_ok_{i}",
-              use_container_width=True,
-              type="primary" if is_ok else "secondary",
-          ):
-            st.session_state[f"status_{i}"] = "OK"
-            st.rerun()
-        with c_nok:
-          is_nok = huidige_status == "NOK"
-          if st.button(
-              "🔴 NOK",
-              key=f"btn_nok_{i}",
-              use_container_width=True,
-              type="primary" if is_nok else "secondary",
-          ):
-            st.session_state[f"status_{i}"] = "NOK"
-            st.rerun()
-
-        comment = st.text_input(
-            "Opmerking (optioneel):",
-            key=f"comm_{i}",
-            placeholder="Typ hier eventuele opmerkingen of schades...",
-        )
-
-        foto_bestandsnaam = st.session_state.get(f"saved_foto_{i}", "")
-        camera_open = st.session_state.get(f"show_cam_{i}", False)
-
-        if not camera_open:
-          label_cam = (
-              "📸 Foto opnieuw nemen"
-              if foto_bestandsnaam
-              else "📷 Take picture (Foto toevoegen)"
-          )
-          if st.button(
-              label_cam, key=f"open_cam_{i}", use_container_width=True
-          ):
-            st.session_state[f"show_cam_{i}"] = True
-            st.rerun()
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("← Terug", use_container_width=True):
+                    st.session_state.wizard_step = totaal
+                    st.rerun()
+            with col_b:
+                if st.button("💾 Opslaan", type="primary", use_container_width=True,
+                             disabled=onbeantwoord > 0):
+                    # ==== OPSLAAN-LOGICA (ongewijzigd t.o.v. jouw code) ====
+                    now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
+                    audit_id = int(get_now().strftime("%y%m%d%H%M%S"))
+                    client = get_supabase()
+                    if not client:
+                        st.error("Supabase verbinding niet gevonden.")
+                    else:
+                        foto_urls = {}
+                        for i, v in enumerate(actieve_vragen):
+                            fn = st.session_state.get(f"saved_foto_{i}", "")
+                            fb = st.session_state.get(f"saved_bytes_{i}", None)
+                            if fn and fb:
+                                try:
+                                    client.storage.from_("audit-fotos").upload(
+                                        path=fn, file=fb,
+                                        file_options={"content-type": "image/png", "upsert": "true"})
+                                    foto_urls[fn] = client.storage.from_("audit-fotos").get_public_url(fn)
+                                except Exception as e:
+                                    st.warning(f"Foto upload: {e}")
+                        try:
+                            client.table("audits").insert({
+                                "id": audit_id, "timestamp": now_str,
+                                "actie": st.session_state.sel_actie,
+                                "klant": st.session_state.sel_klant,
+                                "truck": st.session_state.sel_truck,
+                                "auditor": huidige_gebruiker,
+                            }).execute()
+                            items = [{
+                                "audit_id": audit_id, "vraag": v,
+                                "status": st.session_state.get(f"status_{i}", "OK"),
+                                "commentaar": st.session_state.get(f"comm_{i}", ""),
+                                "foto_url": foto_urls.get(st.session_state.get(f"saved_foto_{i}", ""), ""),
+                            } for i, v in enumerate(actieve_vragen)]
+                            client.table("audit_items").insert(items).execute()
+                            st.success(f"✅ Audit #{audit_id} opgeslagen!")
+                            reset_audit()
+                        except Exception as e:
+                            st.error(f"Fout bij opslaan: {e}")
         else:
-          foto = back_camera_input(key=f"foto_{i}")
-          if foto is not None:
-            tijd_tag = get_now().strftime("%Y%m%d_%H%M%S")
-            safe_truck = (
-                "".join(
-                    c
-                    for c in str(st.session_state.sel_truck)
-                    if c.isalnum() or c in (" ", "_", "-")
-                )
-                .strip()
-                .replace(" ", "_")
-            )
-            foto_bestandsnaam = f"{safe_truck}_v{i+1}_{tijd_tag}.png"
-            foto_bytes = foto.getvalue()
+            # --- 1 VRAAG ---
+            vraag = actieve_vragen[idx]
+            progress = (idx + 1) / totaal
 
-            st.session_state[f"saved_foto_{i}"] = foto_bestandsnaam
-            st.session_state[f"saved_bytes_{i}"] = foto_bytes
-            st.success("✅ Foto succesvol vastgelegd!")
+            # Sticky context + progress
+            st.caption(f"{st.session_state.sel_actie} · {st.session_state.sel_klant} · {st.session_state.sel_truck}")
+            st.progress(progress, text=f"Vraag {idx+1} / {totaal}")
 
-          if st.button(
-              "✖️ Camera sluiten",
-              key=f"close_cam_{i}",
-              use_container_width=True,
-          ):
-            st.session_state[f"show_cam_{i}"] = False
-            st.rerun()
+            # Vraag-titel
+            st.markdown(f"<div class='vraag-titel'>{vraag}</div>", unsafe_allow_html=True)
 
-        if foto_bestandsnaam:
-          st.caption(f"📁 Opgeslagen fotobestand: `{foto_bestandsnaam}`")
+            # OK / NOK (2 kolommen — past in portrait)
+            huidige_status = st.session_state.get(f"status_{idx}", "")
+            c_ok, c_nok = st.columns(2)
+            with c_ok:
+                if st.button("🟢 OK", key=f"btn_ok_{idx}", use_container_width=True,
+                             type="primary" if huidige_status == "OK" else "secondary"):
+                    st.session_state[f"status_{idx}"] = "OK"
+                    st.rerun()
+            with c_nok:
+                if st.button("🔴 NOK", key=f"btn_nok_{idx}", use_container_width=True,
+                             type="primary" if huidige_status == "NOK" else "secondary"):
+                    st.session_state[f"status_{idx}"] = "NOK"
+                    st.rerun()
 
-        antwoorden.append({
-            "vraag": vraag,
-            "status": huidige_status,
-            "commentaar": comment,
-            "foto_pad": foto_bestandsnaam,
-            "foto_bytes": st.session_state.get(f"saved_bytes_{i}", None),
-        })
+            # Opmerking
+            st.text_input("Opmerking (optioneel)", key=f"comm_{idx}",
+                          placeholder="Schade, afwijking, ...")
 
-    # OPSLAAN KNOP
-    st.write("<br>", unsafe_allow_html=True)
-    if st.button(
-        "💾 AUDIT VOLTOOIEN EN OPSLAAN",
-        type="primary",
-        use_container_width=True,
-    ):
-      now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
-      audit_id = int(get_now().strftime("%y%m%d%H%M%S"))
-      client = get_supabase()
+            # Foto: knop → dialog
+            foto_bestandsnaam = st.session_state.get(f"saved_foto_{idx}", "")
+            foto_bytes = st.session_state.get(f"saved_bytes_{idx}", None)
 
-      if not client:
-        st.error(
-            "Supabase verbinding niet gevonden. Controleer je secrets"
-            " instellingen."
-        )
-      else:
-        foto_urls = {}
-        for item in antwoorden:
-          fn = item.get("foto_pad")
-          fb = item.get("foto_bytes")
-          if fn and fb:
-            try:
-              client.storage.from_("audit-fotos").upload(
-                  path=fn,
-                  file=fb,
-                  file_options={"content-type": "image/png", "upsert": "true"},
-              )
-              url = client.storage.from_("audit-fotos").get_public_url(fn)
-              foto_urls[fn] = url
-            except Exception as e:
-              st.warning(f"Foto upload waarschuwing: {e}")
+            if foto_bytes:
+                # Thumbnail + verwijderen
+                col_thumb, col_del = st.columns([1, 2])
+                with col_thumb:
+                    st.image(foto_bytes, width=80)
+                with col_del:
+                    if st.button("🗑️ Foto verwijderen", key=f"delfoto_{idx}", use_container_width=True):
+                        st.session_state.pop(f"saved_foto_{idx}", None)
+                        st.session_state.pop(f"saved_bytes_{idx}", None)
+                        st.rerun()
+            else:
+                if st.button("📷 Foto toevoegen", key=f"open_cam_{idx}", use_container_width=True):
+                    st.session_state[f"show_cam_{idx}"] = True
 
-        try:
-          client.table("audits").insert({
-              "id": audit_id,
-              "timestamp": now_str,
-              "actie": st.session_state.sel_actie,
-              "klant": st.session_state.sel_klant,
-              "truck": st.session_state.sel_truck,
-              "auditor": huidige_gebruiker,
-          }).execute()
+            # Camera in DIALOG (Streamlit >= 1.31)
+            if st.session_state.get(f"show_cam_{idx}", False):
+                @st.dialog("Foto maken")
+                def camera_dialog():
+                    foto = back_camera_input(key=f"foto_{idx}")
+                    if foto is not None:
+                        tijd_tag = get_now().strftime("%Y%m%d_%H%M%S")
+                        safe_truck = "".join(c for c in str(st.session_state.sel_truck)
+                                             if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")
+                        fn = f"{safe_truck}_v{idx+1}_{tijd_tag}.png"
+                        st.session_state[f"saved_foto_{idx}"] = fn
+                        st.session_state[f"saved_bytes_{idx}"] = foto.getvalue()
+                        st.session_state[f"show_cam_{idx}"] = False
+                        st.rerun()
+                    if st.button("✖️ Annuleren", use_container_width=True):
+                        st.session_state[f"show_cam_{idx}"] = False
+                        st.rerun()
+                camera_dialog()
 
-          items_to_insert = []
-          for item in antwoorden:
-            fn = item["foto_pad"]
-            items_to_insert.append({
-                "audit_id": audit_id,
-                "vraag": item["vraag"],
-                "status": item["status"],
-                "commentaar": item["commentaar"],
-                "foto_url": foto_urls.get(fn, ""),
-            })
-
-          client.table("audit_items").insert(items_to_insert).execute()
-          st.success(f"✅ Audit #{audit_id} succesvol permanent opgeslagen!")
-        except Exception as e:
-          st.error(f"Fout bij opslaan in database: {e}")
-
-      st.session_state.sel_actie = None
-      st.session_state.sel_klant = None
-      st.session_state.sel_truck = None
-      for i in range(len(actieve_vragen)):
-        st.session_state.pop(f"status_{i}", None)
-        st.session_state.pop(f"comm_{i}", None)
-        st.session_state.pop(f"show_cam_{i}", None)
-        st.session_state.pop(f"saved_foto_{i}", None)
-        st.session_state.pop(f"saved_bytes_{i}", None)
-        st.session_state.pop(f"foto_{i}", None)
-      st.rerun()
+            # ==== STICKY FOOTER (Vorige / Volgende) ====
+            with st.container(key="nav_footer"):
+                col_prev, col_next = st.columns(2)
+                with col_prev:
+                    if st.button("← Vorige", use_container_width=True):
+                        if idx == 0:
+                            st.session_state.wizard_step = 0
+                        else:
+                            st.session_state.wizard_step = idx  # idx is al 1-based-1
+                        st.rerun()
+                with col_next:
+                    volgende_disabled = huidige_status not in ("OK", "NOK")
+                    label = "Volgende →" if idx < totaal - 1 else "Naar overzicht →"
+                    if st.button(label, type="primary", use_container_width=True,
+                                 disabled=volgende_disabled):
+                        st.session_state.wizard_step = idx + 2  # naar volgende vraag
+                        st.rerun()
 
 # ==========================================
 # ONDERDEEL 2: HISTORIE, KPI'S & RAPPORTAGE
